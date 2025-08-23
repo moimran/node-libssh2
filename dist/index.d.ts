@@ -8,43 +8,48 @@
  * @license MIT
  */
 export { loadlibssh2, cstr, readCString, isNull } from './core/ffi.js';
-export { SSHClient } from './client/ssh-client.js';
-export { SSHShell } from './client/ssh-shell.js';
-export { SSHUtils } from './client/ssh-utils.js';
-export { NodeSSH } from './client/node-ssh.js';
-export type { SSHConnectionOptions, CommandResult, ShellOptions, SystemInfo, TerminalDimensions, Config, SSHExecCommandOptions, SSHExecCommandResponse, SSHExecOptions, SSHPutFilesOptions, SSHGetPutDirectoryOptions, FileTransfer, SSHError } from './types/index.js';
+export { Session } from './core/session.js';
+export { Channel } from './core/channel.js';
+export { SFTP } from './core/sftp.js';
+export { SFTPHandle } from './core/sftp-handle.js';
+export { Agent } from './core/agent.js';
+export { KnownHost } from './core/knownhost.js';
+export { Listener } from './core/listener.js';
+export { sshExec, sshExecMultiple, sshTest, sshInfo } from './wrapper/ssh-async.js';
+export type { SSHConfig, CommandResult } from './wrapper/ssh-async.js';
+export type { SSHConnectionOptions } from './types/index.js';
 export declare const VERSION = "1.0.0";
 export declare const LIBSSH2_VERSION = "1.11.2_DEV";
 /**
  * Quick start examples:
  *
- * Node-SSH compatible API (recommended):
+ * High-level async functions (recommended):
  * ```javascript
- * const { NodeSSH } = require('node-libssh2');
+ * const { sshExec, sshTest } = require('node-libssh2');
  *
- * const ssh = new NodeSSH();
- * await ssh.connect({
+ * // Test connection
+ * const connected = await sshTest({
  *   host: '192.168.1.100',
  *   username: 'root',
  *   password: 'password'
  * });
  *
- * const result = await ssh.execCommand('pwd');
- * console.log(result.stdout);
- * ssh.dispose();
- * ```
- *
- * Original API (still supported):
- * ```javascript
- * const { SSHUtils } = require('node-libssh2');
- *
- * const result = await SSHUtils.executeCommand({
- *   hostname: '192.168.1.100',
+ * // Execute command
+ * const result = await sshExec({
+ *   host: '192.168.1.100',
  *   username: 'root',
  *   password: 'password'
  * }, 'pwd');
  *
- * console.log(result.output);
+ * console.log(result.stdout);
+ * ```
+ *
+ * Low-level core classes (for advanced users):
+ * ```javascript
+ * const { Session, Channel } = require('node-libssh2');
+ *
+ * const session = new Session();
+ * // ... low-level session operations
  * ```
  */
 //# sourceMappingURL=index.d.ts.map

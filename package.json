@@ -9,11 +9,11 @@
     "clean": "rimraf dist",
     "prepublishOnly": "npm run clean && npm run build",
     "postinstall": "node scripts/install-native.js",
-    "test": "node examples/test.js",
-    "example": "node examples/basic.js",
-    "example:node-ssh": "node examples/node-ssh-api.js",
-    "example:comparison": "node examples/api-comparison.js",
-    "example:performance": "node examples/performance.js"
+    "test": "node examples/test-simple-command.js",
+    "example": "node examples/test-simple-command.js",
+    "example:async": "node examples/test-simple-command.js",
+    "example:core": "node examples/low-level-usage.ts",
+    "example:wrapper": "node examples/wrapper-usage.ts"
   },
   "keywords": [
     "ssh",

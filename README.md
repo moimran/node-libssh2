@@ -1,6 +1,6 @@
 # node-libssh2
 
-High-performance SSH client for Node.js with **node-ssh compatible API** using libssh2 native FFI bindings.
+High-performance SSH client for Node.js using libssh2 native FFI bindings with both low-level and high-level APIs.
 
 [![npm version](https://badge.fury.io/js/node-libssh2.svg)](https://badge.fury.io/js/node-libssh2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -62,53 +62,48 @@ npm install node-libssh2
 
 ## Quick Start
 
-### NodeSSH API (node-ssh compatible) - Recommended
+### High-Level Async Functions (Recommended)
 
 ```javascript
-const { NodeSSH } = require('node-libssh2');
+const { sshExec, sshTest } = require('node-libssh2');
 
-const ssh = new NodeSSH();
-
-// Connect to server
-await ssh.connect({
+// Test connection
+const connected = await sshTest({
   host: '192.168.1.100',
   username: 'root',
   password: 'password'
 });
 
-// Execute commands
-const result = await ssh.execCommand('pwd');
-console.log(result.stdout); // "/root"
-console.log(result.code);   // 0
+if (connected) {
+  // Execute command
+  const result = await sshExec({
+    host: '192.168.1.100',
+    username: 'root',
+    password: 'password'
+  }, 'pwd');
 
-// Execute with working directory
-const result2 = await ssh.execCommand('ls -la', { cwd: '/tmp' });
-console.log(result2.stdout);
-
-// Execute with parameters
-const result3 = await ssh.exec('ls', ['-la', '/var']);
-console.log(result3);
-
-// Always disconnect
-ssh.dispose();
+  console.log(result.stdout); // "/root"
+  console.log(result.success); // true
+  console.log(result.exitCode); // 0
+}
 ```
 
-### Original API (still supported)
-
-### Simple Command Execution
+### Low-Level Core Classes (Advanced)
 
 ```javascript
-const { SSHUtils } = require('node-libssh2');
+const { Session, Channel } = require('node-libssh2');
 
-// Execute a single command
-const result = await SSHUtils.executeCommand({
-  hostname: '192.168.1.100',
-  username: 'root',
-  password: 'password'
-}, 'pwd');
+// Create session (requires socket setup)
+const session = new Session();
+// ... socket setup and handshake
+await session.userauth_password('username', 'password');
 
-console.log(result.output); // "/root"
-console.log(result.success); // true
+// Create channel
+const channel = session.open_session();
+await channel.execute('pwd');
+const output = await channel.read();
+
+console.log(output);
 ```
 
 ### Persistent Connection

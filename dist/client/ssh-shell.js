@@ -197,17 +197,9 @@ class SSHShell extends events_1.EventEmitter {
             if (bytesRead > 0) {
                 const data = buffer.subarray(0, Number(bytesRead)).toString();
                 const timestamp = new Date().toISOString().substring(11, 23); // HH:mm:ss.SSS
-                // Check if this looks like a command response (contains prompt)
-                const containsPrompt = data.includes('# ') || data.includes('$ ') ||
-                    data.includes('root@') || data.includes('~#');
-                if (containsPrompt) {
-                    console.log(`📥 SSH RESPONSE [${timestamp}]: Command completed! (${bytesRead} bytes, ${readDuration.toFixed(2)}ms)`);
-                    console.log(`    Preview: "${data.substring(0, 100).replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
-                }
-                else {
-                    console.log(`📥 SSH DATA [${timestamp}]: ${bytesRead} bytes received (${readDuration.toFixed(2)}ms)`);
-                    console.log(`    Preview: "${data.substring(0, 50).replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
-                }
+                // Raw data logging without interpretation
+                console.log(`📥 SSH DATA [${timestamp}]: ${bytesRead} bytes received (${readDuration.toFixed(2)}ms)`);
+                console.log(`    Preview: "${data.substring(0, 50).replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
                 logger_js_1.logger.logDataFlow('SSHShell', 'IN', bytesRead, {
                     readDuration: `${readDuration.toFixed(2)}ms`,
                     preview: data.substring(0, 50).replace(/\n/g, '\\n')
