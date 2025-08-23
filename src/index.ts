@@ -38,7 +38,7 @@ export type {
 
 // Version info
 export const VERSION = '1.0.0';
-export const LIBSSH2_VERSION = '1.11.2';
+export const LIBSSH2_VERSION = '1.11.2_DEV';
 
 /**
  * Quick start examples:
