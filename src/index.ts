@@ -23,11 +23,18 @@ export { Listener } from './core/listener.js';
 // High-level async wrapper functions (recommended for most users)
 export { sshExec, sshExecMultiple, sshTest, sshInfo } from './wrapper/ssh-async.js';
 
+// SSH terminal classes for building terminal applications
+export { SSHClient, SSHTerminal, SSHShell } from './wrapper/index.js';
+
 // Type definitions from wrapper
 export type {
   SSHConfig,
-  CommandResult
-} from './wrapper/ssh-async.js';
+  CommandResult,
+  SSHClientOptions,
+  SSHTerminalOptions,
+  TerminalDimensions,
+  TerminalData
+} from './wrapper/index.js';
 
 // Type definitions from types
 export type {

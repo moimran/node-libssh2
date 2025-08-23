@@ -51,7 +51,8 @@ export class Channel {
     widthPx: number = 0,
     heightPx: number = 0
   ): number {
-    return this.lib.libssh2_channel_request_pty_ex(
+    console.log('🔍 Channel: ptyEx() called - ABOUT TO CALL NATIVE libssh2_channel_request_pty_ex');
+    const result = this.lib.libssh2_channel_request_pty_ex(
       this.channel,
       cstr(term),
       term.length,
@@ -62,6 +63,8 @@ export class Channel {
       widthPx,
       heightPx
     );
+    console.log('🔍 Channel: ptyEx() completed with result:', result);
+    return result;
   }
 
   /**
@@ -77,12 +80,39 @@ export class Channel {
   }
 
   /**
+   * Resize PTY (alias for ptySize for compatibility)
+   * @param cols New width in characters
+   * @param rows New height in characters
+   * @param width New width in pixels (optional)
+   * @param height New height in pixels (optional)
+   * @returns libssh2 return code
+   */
+  ptyResize(cols: number, rows: number, width: number = 0, height: number = 0): number {
+    return this.ptySize(cols, rows, width, height);
+  }
+
+  /**
+   * Send signal to the channel
+   * @param signalName Signal name (e.g., 'TERM', 'KILL', 'INT')
+   * @returns libssh2 return code
+   */
+  signal(signalName: string): number {
+    return this.lib.libssh2_channel_signal_ex(this.channel, cstr(signalName), signalName.length);
+  }
+
+  /**
    * Execute a command on the channel
    * @param command Command to execute
    * @returns libssh2 return code
    */
   execute(command: string): number {
-    return this.lib.libssh2_channel_exec(this.channel, cstr(command));
+    return this.lib.libssh2_channel_process_startup(
+      this.channel,
+      cstr('exec'),
+      4,
+      cstr(command),
+      command.length
+    );
   }
 
   /**
@@ -90,7 +120,16 @@ export class Channel {
    * @returns libssh2 return code
    */
   shell(): number {
-    return this.lib.libssh2_channel_shell(this.channel);
+    console.log('🔍 Channel: shell() called - ABOUT TO CALL NATIVE libssh2_channel_process_startup');
+    const result = this.lib.libssh2_channel_process_startup(
+      this.channel,
+      cstr('shell'),
+      5,
+      null,
+      0
+    );
+    console.log('🔍 Channel: shell() completed with result:', result);
+    return result;
   }
 
   /**
@@ -99,7 +138,13 @@ export class Channel {
    * @returns libssh2 return code
    */
   subsystem(subsystem: string): number {
-    return this.lib.libssh2_channel_subsystem(this.channel, cstr(subsystem));
+    return this.lib.libssh2_channel_process_startup(
+      this.channel,
+      cstr('subsystem'),
+      9,
+      cstr(subsystem),
+      subsystem.length
+    );
   }
 
   /**
@@ -109,7 +154,7 @@ export class Channel {
    * @returns [return_code, bytes_read] - return_code is bytes read if positive, error code if negative
    */
   read(buffer: Buffer, size: number = buffer.length): [number, number] {
-    const bytesRead = this.lib.libssh2_channel_read(this.channel, buffer, size);
+    const bytesRead = this.lib.libssh2_channel_read_ex(this.channel, 0, buffer, size);
     const actualBytes = bytesRead > 0 ? Number(bytesRead) : 0;
     return [Number(bytesRead), actualBytes];
   }
@@ -144,7 +189,7 @@ export class Channel {
    */
   write(data: Buffer | string): [number, number] {
     const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
-    const bytesWritten = this.lib.libssh2_channel_write(this.channel, buffer, buffer.length);
+    const bytesWritten = this.lib.libssh2_channel_write_ex(this.channel, 0, buffer, buffer.length);
     const actualBytes = bytesWritten > 0 ? Number(bytesWritten) : 0;
     return [Number(bytesWritten), actualBytes];
   }
@@ -298,7 +343,13 @@ export class Channel {
    * @returns libssh2 return code
    */
   setenv(varname: string, value: string): number {
-    return this.lib.libssh2_channel_setenv(this.channel, cstr(varname), cstr(value));
+    return this.lib.libssh2_channel_setenv_ex(
+      this.channel,
+      cstr(varname),
+      varname.length,
+      cstr(value),
+      value.length
+    );
   }
 
   /**

@@ -129,7 +129,14 @@ export class Session {
    * @returns libssh2 return code
    */
   userauthPassword(username: string, password: string): number {
-    return this.lib.libssh2_userauth_password(this.session, cstr(username), cstr(password));
+    return this.lib.libssh2_userauth_password_ex(
+      this.session,
+      cstr(username),
+      username.length,
+      cstr(password),
+      password.length,
+      null
+    );
   }
 
   /**
@@ -147,9 +154,10 @@ export class Session {
     passphrase: string = ''
   ): number {
     const pubKey = publicKeyPath ? cstr(publicKeyPath) : null;
-    return this.lib.libssh2_userauth_publickey_fromfile(
+    return this.lib.libssh2_userauth_publickey_fromfile_ex(
       this.session,
       cstr(username),
+      username.length,
       pubKey,
       cstr(privateKeyPath),
       cstr(passphrase)
@@ -250,7 +258,16 @@ export class Session {
    * @returns Raw channel pointer or null on failure
    */
   openSession(): any | null {
-    const channel = this.lib.libssh2_channel_open_session(this.session);
+    const channelType = 'session';
+    const channel = this.lib.libssh2_channel_open_ex(
+      this.session,
+      cstr(channelType),
+      channelType.length,
+      65536, // window size
+      32768, // packet size
+      null,   // message
+      0       // message length
+    );
     if (!channel || isNull(channel)) {
       return null;
     }

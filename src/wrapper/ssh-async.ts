@@ -426,7 +426,7 @@ export async function sshInfo(config: SSHConfig): Promise<{
 /**
  * Create cross-platform socket connection
  */
-async function createSocket(config: SSHConfig): Promise<{ nodeSocket: Socket; nativeSocket: any; platformLib: any }> {
+export async function createSocket(config: SSHConfig): Promise<{ nodeSocket: Socket; nativeSocket: any; platformLib: any }> {
   // Step 1: Create Node.js socket for connection management
   const nodeSocket = await createNodeSocket(config);
 

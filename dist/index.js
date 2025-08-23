@@ -9,7 +9,7 @@
  * @license MIT
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LIBSSH2_VERSION = exports.VERSION = exports.sshInfo = exports.sshTest = exports.sshExecMultiple = exports.sshExec = exports.Listener = exports.KnownHost = exports.Agent = exports.SFTPHandle = exports.SFTP = exports.Channel = exports.Session = exports.isNull = exports.readCString = exports.cstr = exports.loadlibssh2 = void 0;
+exports.LIBSSH2_VERSION = exports.VERSION = exports.SSHShell = exports.SSHTerminal = exports.SSHClient = exports.sshInfo = exports.sshTest = exports.sshExecMultiple = exports.sshExec = exports.Listener = exports.KnownHost = exports.Agent = exports.SFTPHandle = exports.SFTP = exports.Channel = exports.Session = exports.isNull = exports.readCString = exports.cstr = exports.loadlibssh2 = void 0;
 // Core FFI bindings
 var ffi_js_1 = require("./core/ffi.js");
 Object.defineProperty(exports, "loadlibssh2", { enumerable: true, get: function () { return ffi_js_1.loadlibssh2; } });
@@ -37,6 +37,11 @@ Object.defineProperty(exports, "sshExec", { enumerable: true, get: function () {
 Object.defineProperty(exports, "sshExecMultiple", { enumerable: true, get: function () { return ssh_async_js_1.sshExecMultiple; } });
 Object.defineProperty(exports, "sshTest", { enumerable: true, get: function () { return ssh_async_js_1.sshTest; } });
 Object.defineProperty(exports, "sshInfo", { enumerable: true, get: function () { return ssh_async_js_1.sshInfo; } });
+// SSH terminal classes for building terminal applications
+var index_js_1 = require("./wrapper/index.js");
+Object.defineProperty(exports, "SSHClient", { enumerable: true, get: function () { return index_js_1.SSHClient; } });
+Object.defineProperty(exports, "SSHTerminal", { enumerable: true, get: function () { return index_js_1.SSHTerminal; } });
+Object.defineProperty(exports, "SSHShell", { enumerable: true, get: function () { return index_js_1.SSHShell; } });
 // Version info
 exports.VERSION = '1.0.0';
 exports.LIBSSH2_VERSION = '1.11.2_DEV';

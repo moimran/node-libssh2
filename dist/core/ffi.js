@@ -177,6 +177,7 @@ const libssh2Symbols = {
     libssh2_channel_wait_eof: { result: 'int', parameters: ['void*'] },
     libssh2_channel_get_exit_status: { result: 'int', parameters: ['void*'] },
     libssh2_channel_get_exit_signal: { result: 'int', parameters: ['void*', 'void*', 'void*', 'void*', 'void*', 'void*', 'void*'] },
+    libssh2_channel_signal_ex: { result: 'int', parameters: ['void*', 'str', 'uint32'] },
     libssh2_channel_request_pty_ex: { result: 'int', parameters: ['void*', 'str', 'uint32', 'str', 'uint32', 'int', 'int', 'int', 'int'] },
     // libssh2_channel_request_pty: REMOVED - doesn't exist, use _ex version
     libssh2_channel_request_pty_size_ex: { result: 'int', parameters: ['void*', 'int', 'int', 'int', 'int'] },

@@ -81,24 +81,42 @@ export interface ForwardConfig {
 }
 
 /**
- * SSH connection events
+ * SSH client options for connection management
  */
-export interface SSHEvents {
-  connect: () => void;
-  disconnect: () => void;
-  error: (error: Error) => void;
-  data: (data: Buffer) => void;
-  timeout: () => void;
+export interface SSHClientOptions extends SSHConfig {
+  keepAlive?: boolean;
+  keepAliveInterval?: number;
+  readyTimeout?: number;
 }
 
 /**
- * Shell options
+ * SSH terminal options
  */
-export interface ShellOptions {
+export interface SSHTerminalOptions {
   term?: string;
   cols?: number;
   rows?: number;
   env?: Record<string, string>;
+  modes?: string;
+}
+
+/**
+ * Terminal dimensions
+ */
+export interface TerminalDimensions {
+  cols: number;
+  rows: number;
+  width?: number;
+  height?: number;
+}
+
+/**
+ * Terminal data with metadata
+ */
+export interface TerminalData {
+  data: Buffer;
+  stderr?: boolean;
+  length: number;
 }
 
 /**
