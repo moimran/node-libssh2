@@ -21,6 +21,25 @@ High-performance SSH client for Node.js with **node-ssh compatible API** using l
 npm install node-libssh2
 ```
 
+### 🚀 **Automatic Platform Optimization**
+
+The package automatically optimizes itself during installation:
+
+- **📦 Downloads**: All platform libraries (Windows, Linux, macOS)
+- **🔧 Optimizes**: Automatically removes unnecessary libraries for other platforms
+- **💾 Saves Space**: Keeps only the libraries needed for your platform
+
+**Example optimization on Windows:**
+```
+🔍 Optimizing for platform: win32-x64
+📦 Keeping libraries for: windows
+🗑️  Removing libraries for: linux, macos
+✅ Removed linux libraries (339.7 KB saved)
+🎉 Optimization complete! Saved 339.7 KB of disk space.
+```
+
+**Result**: Instead of 1.6 MB, you only get ~1.2 MB installed!
+
 ## Migration from node-ssh
 
 **It's that simple!**

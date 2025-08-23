@@ -8,6 +8,7 @@
     "build": "tsc",
     "clean": "rimraf dist",
     "prepublishOnly": "npm run clean && npm run build",
+    "postinstall": "node scripts/install-native.js",
     "test": "node examples/test.js",
     "example": "node examples/basic.js",
     "example:node-ssh": "node examples/node-ssh-api.js",
@@ -65,10 +66,12 @@
   "files": [
     "dist/**/*",
     "libs/**/*",
+    "scripts/**/*",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
   ],
+
   "publishConfig": {
     "access": "public"
   }
