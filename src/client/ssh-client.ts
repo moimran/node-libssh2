@@ -7,6 +7,8 @@
 import { loadlibssh2, cstr, isNull } from '../core/ffi.js';
 import { SSHConnectionOptions, CommandResult, SSHConnectionError, SSHAuthenticationError, SSHCommandError } from '../types/index.js';
 import * as koffi from 'koffi';
+import { Socket } from 'net';
+import * as os from 'os';
 
 /**
  * High-performance SSH client with optimized command execution
@@ -21,8 +23,9 @@ import * as koffi from 'koffi';
 export class SSHClient {
   private lib: any = null;
   private session: any = null;
-  private socket: any = null;
-  private ws2_32: any = null;
+  private nodeSocket: Socket | null = null;  // Node.js socket for connection
+  private nativeSocket: any = null;          // Platform-specific socket for libssh2
+  private platformLib: any = null;           // Platform-specific library (ws2_32 or libc)
   private connected = false;
   private connectionOptions: SSHConnectionOptions | null = null;
 
@@ -59,7 +62,7 @@ export class SSHClient {
       }
 
       // Perform handshake
-      const handshakeResult = this.lib.libssh2_session_handshake(this.session, Number(this.socket));
+      const handshakeResult = this.lib.libssh2_session_handshake(this.session, Number(this.nativeSocket));
       if (handshakeResult !== 0) {
         throw new SSHConnectionError(`SSH handshake failed: ${handshakeResult}`);
       }
@@ -223,17 +226,34 @@ export class SSHClient {
       this.session = null;
     }
 
-    if (this.socket && this.ws2_32) {
+    // Clean up Node.js socket
+    if (this.nodeSocket) {
       try {
-        const closesocket = this.ws2_32.func('closesocket', 'int', ['uintptr_t']);
-        const WSACleanup = this.ws2_32.func('WSACleanup', 'int', []);
-        closesocket(this.socket);
-        WSACleanup();
+        this.nodeSocket.destroy();
       } catch (e) {
         // Ignore cleanup errors
       }
-      this.socket = null;
-      this.ws2_32 = null;
+      this.nodeSocket = null;
+    }
+
+    // Clean up platform-specific socket
+    if (this.nativeSocket && this.platformLib) {
+      try {
+        if (os.platform() === 'win32') {
+          const closesocket = this.platformLib.func('closesocket', 'int', ['uintptr_t']);
+          const WSACleanup = this.platformLib.func('WSACleanup', 'int', []);
+          closesocket(this.nativeSocket);
+          WSACleanup();
+        } else {
+          // Unix-like systems
+          const close = this.platformLib.func('close', 'int', ['int']);
+          close(this.nativeSocket);
+        }
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      this.nativeSocket = null;
+      this.platformLib = null;
     }
 
     if (this.lib) {
@@ -250,35 +270,121 @@ export class SSHClient {
   }
 
   /**
-   * Create socket connection with proper error handling
+   * Create cross-platform socket connection
    */
   private async createSocketConnection(hostname: string, port: number, timeout: number): Promise<void> {
-    this.ws2_32 = koffi.load('ws2_32.dll');
-    
-    const WSAStartup = this.ws2_32.func('WSAStartup', 'int', ['uint16', 'void*']);
-    const socketFunc = this.ws2_32.func('socket', 'uintptr_t', ['int', 'int', 'int']);
-    const connect = this.ws2_32.func('connect', 'int', ['uintptr_t', 'void*', 'int']);
-    const inet_addr = this.ws2_32.func('inet_addr', 'uint32', ['str']);
-    
+    // Step 1: Create Node.js socket for connection management
+    await this.createNodeSocket(hostname, port, timeout);
+
+    // Step 2: Create platform-specific socket for libssh2
+    await this.createNativeSocket(hostname, port);
+  }
+
+  /**
+   * Create Node.js socket for connection management
+   */
+  private async createNodeSocket(hostname: string, port: number, timeout: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.nodeSocket = new Socket();
+
+      if (timeout > 0) {
+        this.nodeSocket.setTimeout(timeout);
+      }
+
+      this.nodeSocket.on('connect', () => {
+        resolve();
+      });
+
+      this.nodeSocket.on('error', (error) => {
+        reject(new SSHConnectionError(`Failed to connect to ${hostname}:${port}: ${error.message}`));
+      });
+
+      this.nodeSocket.on('timeout', () => {
+        this.nodeSocket?.destroy();
+        reject(new SSHConnectionError(`Connection timeout to ${hostname}:${port}`));
+      });
+
+      this.nodeSocket.connect(port, hostname);
+    });
+  }
+
+  /**
+   * Create platform-specific native socket for libssh2
+   */
+  private async createNativeSocket(hostname: string, port: number): Promise<void> {
+    const platform = os.platform();
+
+    if (platform === 'win32') {
+      await this.createWindowsSocket(hostname, port);
+    } else {
+      await this.createUnixSocket(hostname, port);
+    }
+  }
+
+  /**
+   * Create Windows socket using ws2_32.dll
+   */
+  private async createWindowsSocket(hostname: string, port: number): Promise<void> {
+    this.platformLib = koffi.load('ws2_32.dll');
+
+    const WSAStartup = this.platformLib.func('WSAStartup', 'int', ['uint16', 'void*']);
+    const socketFunc = this.platformLib.func('socket', 'uintptr_t', ['int', 'int', 'int']);
+    const connect = this.platformLib.func('connect', 'int', ['uintptr_t', 'void*', 'int']);
+    const inet_addr = this.platformLib.func('inet_addr', 'uint32', ['str']);
+
     const wsaData = Buffer.alloc(400);
     const wsaResult = WSAStartup(0x0202, wsaData);
     if (wsaResult !== 0) {
       throw new SSHConnectionError(`WSAStartup failed: ${wsaResult}`);
     }
-    
-    this.socket = socketFunc(2, 1, 6); // AF_INET, SOCK_STREAM, IPPROTO_TCP
-    if (this.socket === 0xFFFFFFFF) {
-      throw new SSHConnectionError('Failed to create socket');
+
+    this.nativeSocket = socketFunc(2, 1, 6); // AF_INET, SOCK_STREAM, IPPROTO_TCP
+    if (this.nativeSocket === 0xFFFFFFFF) {
+      throw new SSHConnectionError('Failed to create Windows socket');
     }
-    
+
     const sockaddr = Buffer.alloc(16);
     sockaddr.writeUInt16LE(2, 0); // AF_INET
     sockaddr.writeUInt16BE(port, 2);
     sockaddr.writeUInt32LE(inet_addr(hostname), 4);
-    
-    const connectResult = connect(this.socket, sockaddr, 16);
+
+    const connectResult = connect(this.nativeSocket, sockaddr, 16);
     if (connectResult !== 0) {
-      throw new SSHConnectionError(`Failed to connect to ${hostname}:${port}`);
+      throw new SSHConnectionError(`Failed to connect Windows socket to ${hostname}:${port}`);
+    }
+  }
+
+  /**
+   * Create Unix socket using libc
+   */
+  private async createUnixSocket(hostname: string, port: number): Promise<void> {
+    try {
+      this.platformLib = koffi.load('libc.so.6');
+    } catch {
+      try {
+        this.platformLib = koffi.load('libc.dylib'); // macOS
+      } catch {
+        throw new SSHConnectionError('Failed to load libc for Unix socket creation');
+      }
+    }
+
+    const socket = this.platformLib.func('socket', 'int', ['int', 'int', 'int']);
+    const connect = this.platformLib.func('connect', 'int', ['int', 'void*', 'int']);
+    const inet_addr = this.platformLib.func('inet_addr', 'uint32', ['str']);
+
+    this.nativeSocket = socket(2, 1, 6); // AF_INET, SOCK_STREAM, IPPROTO_TCP
+    if (this.nativeSocket === -1) {
+      throw new SSHConnectionError('Failed to create Unix socket');
+    }
+
+    const sockaddr = Buffer.alloc(16);
+    sockaddr.writeUInt16LE(2, 0); // AF_INET
+    sockaddr.writeUInt16BE(port, 2);
+    sockaddr.writeUInt32LE(inet_addr(hostname), 4);
+
+    const connectResult = connect(this.nativeSocket, sockaddr, 16);
+    if (connectResult !== 0) {
+      throw new SSHConnectionError(`Failed to connect Unix socket to ${hostname}:${port}`);
     }
   }
 }
