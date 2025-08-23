@@ -3,7 +3,7 @@
  *
  * Provides terminal-like interactive shell sessions over SSH.
  */
-import { ShellOptions } from '../types/index.js';
+import { ShellOptions, TerminalDimensions } from '../types/index.js';
 import { SSHClient } from './ssh-client.js';
 /**
  * Interactive SSH shell for terminal-like sessions
@@ -19,6 +19,8 @@ export declare class SSHShell {
     private channel;
     private active;
     private lib;
+    private currentWidth;
+    private currentHeight;
     constructor(client: SSHClient);
     /**
      * Start an interactive shell session
@@ -69,10 +71,23 @@ export declare class SSHShell {
     /**
      * Resize the terminal
      *
-     * @param width New terminal width
-     * @param height New terminal height
+     * @param width New terminal width (columns)
+     * @param height New terminal height (rows)
      */
     resize(width: number, height: number): Promise<void>;
+    /**
+     * Resize the terminal using cols/rows (alias for resize)
+     *
+     * @param cols Number of columns
+     * @param rows Number of rows
+     */
+    resizeTerminal(cols: number, rows: number): Promise<void>;
+    /**
+     * Get current terminal dimensions
+     *
+     * @returns Object with current width and height
+     */
+    getDimensions(): TerminalDimensions;
     /**
      * Send a signal to the shell process
      *

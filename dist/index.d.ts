@@ -12,7 +12,7 @@ export { SSHClient } from './client/ssh-client.js';
 export { SSHShell } from './client/ssh-shell.js';
 export { SSHUtils } from './client/ssh-utils.js';
 export { NodeSSH } from './client/node-ssh.js';
-export type { SSHConnectionOptions, CommandResult, ShellOptions, SystemInfo, Config, SSHExecCommandOptions, SSHExecCommandResponse, SSHExecOptions, SSHPutFilesOptions, SSHGetPutDirectoryOptions, FileTransfer, SSHError } from './types/index.js';
+export type { SSHConnectionOptions, CommandResult, ShellOptions, SystemInfo, TerminalDimensions, Config, SSHExecCommandOptions, SSHExecCommandResponse, SSHExecOptions, SSHPutFilesOptions, SSHGetPutDirectoryOptions, FileTransfer, SSHError } from './types/index.js';
 export declare const VERSION = "1.0.0";
 export declare const LIBSSH2_VERSION = "1.11.2_DEV";
 /**

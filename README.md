@@ -150,7 +150,7 @@ const client = new SSHClient();
 await client.connect(options);
 
 const shell = new SSHShell(client);
-await shell.start();
+await shell.start({ terminalType: 'xterm', width: 80, height: 24 });
 
 // Send commands
 await shell.write('pwd\n');
@@ -159,6 +159,10 @@ await shell.write('ls -la\n');
 // Read output
 const output = await shell.read(1000);
 console.log(output);
+
+// Resize terminal (perfect for xterm.js integration)
+await shell.resize(120, 30);  // 120 columns, 30 rows
+console.log(shell.getDimensions()); // { width: 120, height: 30, cols: 120, rows: 30 }
 
 shell.close();
 client.disconnect();
@@ -179,7 +183,37 @@ Main class for SSH connections.
 
 ### SSHShell
 
-Interactive shell for terminal sessions.
+Interactive shell for terminal sessions with full PTY support.
+
+#### Methods
+
+- `start(options)` - Start interactive shell with PTY
+- `write(data)` - Send input to shell
+- `read(timeout)` - Read output from shell
+- `resize(width, height)` - Resize terminal dimensions
+- `resizeTerminal(cols, rows)` - Alias for resize()
+- `getDimensions()` - Get current terminal dimensions
+- `executeCommand(command)` - Execute command and read output
+- `close()` - Close shell session
+
+#### Terminal Resize Support
+
+Perfect for xterm.js and other terminal emulators:
+
+```javascript
+const shell = new SSHShell(client);
+await shell.start({ width: 80, height: 24 });
+
+// Resize when user resizes terminal window
+await shell.resize(120, 30);
+
+// Get current dimensions
+const dims = shell.getDimensions();
+console.log(dims); // { width: 120, height: 30, cols: 120, rows: 30 }
+
+// Alternative syntax
+await shell.resizeTerminal(100, 25);
+```
 
 #### Methods
 

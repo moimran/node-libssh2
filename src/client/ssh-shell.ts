@@ -5,7 +5,7 @@
  */
 
 import { cstr, isNull } from '../core/ffi.js';
-import { ShellOptions, SSHCommandError } from '../types/index.js';
+import { ShellOptions, SSHCommandError, TerminalDimensions } from '../types/index.js';
 import { SSHClient } from './ssh-client.js';
 
 /**
@@ -22,6 +22,8 @@ export class SSHShell {
   private channel: any = null;
   private active = false;
   private lib: any = null;
+  private currentWidth = 80;
+  private currentHeight = 24;
 
   constructor(client: SSHClient) {
     this.client = client;
@@ -89,6 +91,9 @@ export class SSHShell {
         throw new SSHCommandError(`Failed to start shell: ${shellResult}`);
       }
 
+      // Store initial dimensions
+      this.currentWidth = width;
+      this.currentHeight = height;
       this.active = true;
     } catch (error) {
       // Cleanup on failure
@@ -314,20 +319,67 @@ export class SSHShell {
 
   /**
    * Resize the terminal
-   * 
-   * @param width New terminal width
-   * @param height New terminal height
+   *
+   * @param width New terminal width (columns)
+   * @param height New terminal height (rows)
    */
   async resize(width: number, height: number): Promise<void> {
     if (!this.active || !this.channel) {
       throw new SSHCommandError('Shell not active');
     }
 
-    // Note: libssh2 doesn't have a direct resize function
-    // This would typically require sending a window change signal
-    // For now, we'll just store the dimensions
-    // A full implementation would need to send SIGWINCH or similar
-    console.warn('Terminal resize not fully implemented in libssh2');
+    if (width <= 0 || height <= 0) {
+      throw new SSHCommandError('Width and height must be positive numbers');
+    }
+
+    try {
+      // Use libssh2_channel_request_pty_size_ex to resize the PTY
+      const result = this.lib.libssh2_channel_request_pty_size_ex(
+        this.channel,
+        width,   // columns
+        height,  // rows
+        0,       // width_px (pixel width, 0 = not specified)
+        0        // height_px (pixel height, 0 = not specified)
+      );
+
+      if (result !== 0) {
+        throw new SSHCommandError(`Failed to resize terminal: ${result}`);
+      }
+
+      // Store the new dimensions for reference
+      this.currentWidth = width;
+      this.currentHeight = height;
+
+    } catch (error) {
+      if (error instanceof SSHCommandError) {
+        throw error;
+      }
+      throw new SSHCommandError(`Terminal resize failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Resize the terminal using cols/rows (alias for resize)
+   *
+   * @param cols Number of columns
+   * @param rows Number of rows
+   */
+  async resizeTerminal(cols: number, rows: number): Promise<void> {
+    return this.resize(cols, rows);
+  }
+
+  /**
+   * Get current terminal dimensions
+   *
+   * @returns Object with current width and height
+   */
+  getDimensions(): TerminalDimensions {
+    return {
+      width: this.currentWidth,
+      height: this.currentHeight,
+      cols: this.currentWidth,   // Alias for compatibility
+      rows: this.currentHeight   // Alias for compatibility
+    };
   }
 
   /**

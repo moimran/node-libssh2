@@ -25,6 +25,7 @@ export type {
   CommandResult,
   ShellOptions,
   SystemInfo,
+  TerminalDimensions,
   // Node-SSH compatible types
   Config,
   SSHExecCommandOptions,

@@ -77,6 +77,7 @@ const libssh2Symbols = {
     libssh2_channel_close: { result: 'int', parameters: ['void*'] },
     libssh2_channel_free: { result: 'int', parameters: ['void*'] },
     libssh2_channel_request_pty_ex: { result: 'int', parameters: ['void*', 'str', 'uint32', 'str', 'uint32', 'int', 'int', 'int', 'int'] },
+    libssh2_channel_request_pty_size_ex: { result: 'int', parameters: ['void*', 'int', 'int', 'int', 'int'] },
     libssh2_channel_get_exit_status: { result: 'int', parameters: ['void*'] },
 };
 /**

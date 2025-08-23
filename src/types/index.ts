@@ -58,6 +58,23 @@ export interface ShellOptions {
 }
 
 /**
+ * Terminal dimensions
+ */
+export interface TerminalDimensions {
+  /** Terminal width in characters */
+  width: number;
+
+  /** Terminal height in characters */
+  height: number;
+
+  /** Alias for width (columns) */
+  cols: number;
+
+  /** Alias for height (rows) */
+  rows: number;
+}
+
+/**
  * System information from remote host
  */
 export interface SystemInfo {
