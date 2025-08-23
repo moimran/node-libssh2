@@ -90,32 +90,42 @@ async function nodeSshApiExamples() {
     await ssh.execCommand('rmdir /tmp/node-libssh2-test');
     console.log('🗑️ Directory removed\n');
 
-    // Example 7: Interactive shell
-    console.log('🐚 Example 7: Interactive Shell');
-    console.log('-------------------------------');
-    
-    console.log('🚀 Starting interactive shell...');
-    await ssh.withShell(async (shell) => {
-      console.log('✅ Shell started');
-      
-      // Send commands to shell
-      console.log('💻 Sending: pwd');
-      await shell.write('pwd\n');
-      
-      // Wait and read output
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const output = await shell.read(1000);
-      console.log(`📤 Shell output:\n${output}`);
-      
-      console.log('💻 Sending: echo "Hello from NodeSSH!"');
-      await shell.write('echo "Hello from NodeSSH!"\n');
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const output2 = await shell.read(1000);
-      console.log(`📤 Shell output:\n${output2}`);
-      
-      console.log('✅ Shell session completed');
-    });
+    // Example 7: Terminal-style Command Execution (for xterm.js integration)
+    console.log('�️ Example 7: Terminal-style Commands (xterm.js ready)');
+    console.log('---------------------------------------------------');
+
+    console.log('� Simulating terminal commands for xterm.js integration...');
+
+    // These are the types of commands you'd execute from xterm.js
+    const terminalCommands = [
+      'pwd',
+      'ls -la',
+      'whoami',
+      'ps aux | head -10',
+      'df -h',
+      'free -h',
+      'uptime'
+    ];
+
+    const terminalStartTime = Date.now();
+
+    for (const cmd of terminalCommands) {
+      const cmdStart = Date.now();
+      const result = await ssh.execCommand(cmd);
+      const cmdTime = Date.now() - cmdStart;
+
+      console.log(`� ${cmd} (${cmdTime}ms)`);
+      console.log(`📤 Output: ${result.stdout.split('\n')[0]}...`); // Show first line only
+
+      if (result.stderr) {
+        console.log(`❌ Error: ${result.stderr}`);
+      }
+    }
+
+    const terminalTotalTime = Date.now() - terminalStartTime;
+    console.log(`⚡ Total time for ${terminalCommands.length} commands: ${terminalTotalTime}ms`);
+    console.log(`📊 Average: ${(terminalTotalTime / terminalCommands.length).toFixed(1)}ms per command`);
+    console.log('✅ Terminal simulation completed');
 
     // Example 8: Command with output callbacks
     console.log('\n📡 Example 8: Real-time Output Callbacks');

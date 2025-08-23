@@ -12,7 +12,6 @@
     "example": "node examples/basic.js",
     "example:node-ssh": "node examples/node-ssh-api.js",
     "example:comparison": "node examples/api-comparison.js",
-    "example:interactive": "node examples/interactive.js",
     "example:performance": "node examples/performance.js"
   },
   "keywords": [

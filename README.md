@@ -10,7 +10,6 @@ High-performance SSH client for Node.js with **node-ssh compatible API** using l
 - 🔄 **node-ssh Compatible** - Drop-in replacement for the popular node-ssh library
 - ⚡ **High Performance** - Native libssh2 bindings with FFI (68% faster than alternatives)
 - 🔐 **Secure** - Full SSH2 protocol support with authentication
-- 🖥️ **Interactive Shells** - Real-time terminal sessions
 - ⚡ **Fast Commands** - Optimized command execution (~5-50ms response times)
 - 🎯 **Easy API** - Promise-based interface with dual API support
 - 🔧 **TypeScript** - Full type definitions included
@@ -70,13 +69,6 @@ console.log(result2.stdout);
 // Execute with parameters
 const result3 = await ssh.exec('ls', ['-la', '/var']);
 console.log(result3);
-
-// Interactive shell
-await ssh.withShell(async (shell) => {
-  await shell.write('pwd\n');
-  const output = await shell.read(1000);
-  console.log(output);
-});
 
 // Always disconnect
 ssh.dispose();
@@ -236,6 +228,8 @@ await client.connect(config);
 const result = await client.executeCommand('pwd');
 ```
 
+
+
 ## Performance
 
 node-libssh2 is optimized for speed:
@@ -282,14 +276,12 @@ See the `examples/` directory for complete working examples:
 
 ### Original API Examples
 - `basic.js` - Simple command execution
-- `interactive.js` - Interactive shell session
 - `performance.js` - Performance benchmarks
 
 ### Run Examples
 ```bash
 npm run example:node-ssh     # NodeSSH API demo
 npm run example:comparison   # API comparison
-npm run example:interactive  # Interactive shell
 npm run example:performance  # Performance tests
 ```
 

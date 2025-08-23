@@ -246,24 +246,20 @@ export class NodeSSH {
   }
 
   /**
-   * Request an interactive shell
-   * 
+   * Request an interactive shell (deprecated - use execCommand for terminal apps)
+   *
+   * @deprecated Use execCommand() instead for better performance in terminal applications
    * @param options Shell options
    * @returns Promise that resolves to shell channel
    */
   async requestShell(options: any = {}): Promise<any> {
-    if (!this.isConnected()) {
-      throw new SSHError('Not connected to SSH server');
-    }
-
-    const shell = new SSHShell(this.client);
-    await shell.start(options);
-    return shell;
+    throw new SSHError('Interactive shell not supported - use execCommand() for terminal applications like xterm.js');
   }
 
   /**
-   * Execute a callback with an interactive shell
-   * 
+   * Execute a callback with an interactive shell (deprecated - use execCommand for terminal apps)
+   *
+   * @deprecated Use execCommand() instead for better performance in terminal applications
    * @param callback Function to execute with shell
    * @param options Shell options
    * @returns Promise that resolves when callback completes
@@ -272,12 +268,7 @@ export class NodeSSH {
     callback: (shell: any) => Promise<void>,
     options: any = {}
   ): Promise<void> {
-    const shell = await this.requestShell(options);
-    try {
-      await callback(shell);
-    } finally {
-      shell.close();
-    }
+    throw new SSHError('Interactive shell not supported - use execCommand() for terminal applications like xterm.js');
   }
 
   /**

@@ -129,8 +129,8 @@ export class SSHShell {
   }
 
   /**
-   * Read output from the shell
-   * 
+   * Read output from the shell (optimized for speed)
+   *
    * @param timeoutMs Maximum time to wait for data (default: 1000ms)
    * @returns Output from shell
    */
@@ -139,21 +139,31 @@ export class SSHShell {
       throw new SSHCommandError('Shell not active');
     }
 
-    const buffer = Buffer.alloc(8192);
+    const buffer = Buffer.alloc(16384); // Larger buffer for better performance
     let output = '';
     const startTime = Date.now();
+    let emptyReads = 0;
 
     while (Date.now() - startTime < timeoutMs) {
       const bytesRead = this.lib.libssh2_channel_read_ex(this.channel, 0, buffer, buffer.length);
-      
+
       if (bytesRead > 0) {
         output += buffer.subarray(0, Number(bytesRead)).toString();
+        emptyReads = 0;
+        // Continue reading immediately if we got data
+        continue;
       } else if (bytesRead === 0) {
         // EOF
         break;
       } else if (bytesRead === -37) {
-        // EAGAIN - no data available, wait a bit
-        await new Promise(resolve => setTimeout(resolve, 10));
+        // EAGAIN - no data available
+        emptyReads++;
+        // If we have some output and multiple empty reads, return what we have
+        if (output.length > 0 && emptyReads > 3) {
+          break;
+        }
+        // Much shorter delay for responsiveness
+        await new Promise(resolve => setTimeout(resolve, 1));
       } else {
         // Error
         break;
@@ -164,20 +174,20 @@ export class SSHShell {
   }
 
   /**
-   * Read output from shell with smart detection
-   * 
+   * Read output from shell with smart detection (optimized)
+   *
    * This method reads until no more data is available, making it suitable
    * for reading command output that may arrive in multiple chunks.
-   * 
+   *
    * @param maxWaitMs Maximum time to wait for additional data
    * @returns Complete output from shell
    */
-  async readUntilComplete(maxWaitMs = 2000): Promise<string> {
+  async readUntilComplete(maxWaitMs = 1000): Promise<string> {
     if (!this.active || !this.channel) {
       throw new SSHCommandError('Shell not active');
     }
 
-    const buffer = Buffer.alloc(8192);
+    const buffer = Buffer.alloc(16384); // Larger buffer
     let output = '';
     let lastDataTime = Date.now();
     const startTime = Date.now();
@@ -185,25 +195,27 @@ export class SSHShell {
 
     while (Date.now() - startTime < maxWaitMs) {
       const bytesRead = this.lib.libssh2_channel_read_ex(this.channel, 0, buffer, buffer.length);
-      
+
       if (bytesRead > 0) {
         output += buffer.subarray(0, Number(bytesRead)).toString();
         lastDataTime = Date.now();
         consecutiveEmptyReads = 0;
+        // Continue immediately if we got data
+        continue;
       } else if (bytesRead === 0) {
         // EOF
         break;
       } else if (bytesRead === -37) {
         // EAGAIN - no data available
         consecutiveEmptyReads++;
-        
-        // If we haven't received data for a while and have had several empty reads,
-        // assume we're done
-        if (Date.now() - lastDataTime > 500 && consecutiveEmptyReads > 10) {
+
+        // Much more aggressive completion detection for speed
+        if (Date.now() - lastDataTime > 100 && consecutiveEmptyReads > 5) {
           break;
         }
-        
-        await new Promise(resolve => setTimeout(resolve, 10));
+
+        // Very short delay for responsiveness
+        await new Promise(resolve => setTimeout(resolve, 1));
       } else {
         // Error
         break;
@@ -211,6 +223,93 @@ export class SSHShell {
     }
 
     return output;
+  }
+
+  /**
+   * Execute a command and read its output quickly (optimized for speed)
+   *
+   * @param command Command to execute
+   * @param timeoutMs Maximum time to wait for output
+   * @returns Command output
+   */
+  async executeCommand(command: string, timeoutMs = 500): Promise<string> {
+    if (!this.active || !this.channel) {
+      throw new SSHCommandError('Shell not active');
+    }
+
+    // Send command
+    await this.write(command + '\n');
+
+    // Read output with smart prompt detection
+    return await this.readUntilPrompt(timeoutMs);
+  }
+
+  /**
+   * Read until we see a shell prompt (much faster than timeout-based reading)
+   */
+  async readUntilPrompt(timeoutMs = 500): Promise<string> {
+    if (!this.active || !this.channel) {
+      throw new SSHCommandError('Shell not active');
+    }
+
+    const buffer = Buffer.alloc(16384);
+    let output = '';
+    const startTime = Date.now();
+    let lastDataTime = Date.now();
+
+    while (Date.now() - startTime < timeoutMs) {
+      const bytesRead = this.lib.libssh2_channel_read_ex(this.channel, 0, buffer, buffer.length);
+
+      if (bytesRead > 0) {
+        const chunk = buffer.subarray(0, Number(bytesRead)).toString();
+        output += chunk;
+        lastDataTime = Date.now();
+
+        // Check for common shell prompts to detect command completion
+        if (this.hasPrompt(output)) {
+          break;
+        }
+
+        // Continue immediately if we got data
+        continue;
+      } else if (bytesRead === 0) {
+        // EOF
+        break;
+      } else if (bytesRead === -37) {
+        // EAGAIN - no data available
+        // If we have output and haven't received data recently, we're probably done
+        if (output.length > 0 && Date.now() - lastDataTime > 50) {
+          break;
+        }
+
+        // Very short delay
+        await new Promise(resolve => setTimeout(resolve, 1));
+      } else {
+        // Error
+        break;
+      }
+    }
+
+    return output;
+  }
+
+  /**
+   * Check if the output contains a shell prompt
+   */
+  private hasPrompt(output: string): boolean {
+    const lines = output.split('\n');
+    const lastLine = lines[lines.length - 1] || '';
+
+    // Common shell prompt patterns
+    const promptPatterns = [
+      /[#$%>]\s*$/,           // Basic prompts ending with #, $, %, or >
+      /root@.*[#$]\s*$/,      // root@hostname# or root@hostname$
+      /.*@.*[#$]\s*$/,        // user@hostname# or user@hostname$
+      /.*:\w*[#$]\s*$/,       // path:dir# or path:dir$
+      /.*~[#$]\s*$/,          // ~/path# or ~/path$
+    ];
+
+    return promptPatterns.some(pattern => pattern.test(lastLine));
   }
 
   /**
@@ -282,7 +381,7 @@ export class SSHShell {
   }
 
   /**
-   * Close the shell session
+   * Close the shell session (optimized)
    */
   close(): void {
     if (this.channel && this.active && this.lib) {
@@ -294,18 +393,15 @@ export class SSHShell {
           Buffer.from('exit\n'),
           5
         );
-        
-        // Wait a bit for graceful shutdown
-        setTimeout(() => {
-          if (this.channel && this.lib) {
-            this.lib.libssh2_channel_close(this.channel);
-            this.lib.libssh2_channel_free(this.channel);
-          }
-        }, 100);
+
+        // Immediate cleanup for better performance
+        // The shell will close on its own with the exit command
+        this.lib.libssh2_channel_close(this.channel);
+        this.lib.libssh2_channel_free(this.channel);
       } catch (e) {
         // Ignore cleanup errors
       }
-      
+
       this.channel = null;
       this.active = false;
     }
