@@ -75,16 +75,17 @@ export class SSHUtils {
       ]);
 
       // Extract kernel version from uname output
-      const kernelMatch = os.output.match(/(\d+\.\d+\.\d+)/);
+      const osOutput = os.output || '';
+      const kernelMatch = osOutput.match(/(\d+\.\d+\.\d+)/);
       const kernel = kernelMatch ? kernelMatch[1] : 'Unknown';
 
       return {
-        hostname: hostname.output.trim(),
-        os: os.output.trim(),
+        hostname: (hostname.output || 'unknown').trim(),
+        os: osOutput.trim(),
         kernel,
-        uptime: uptime.output.trim(),
-        currentUser: user.output.trim(),
-        currentDirectory: pwd.output.trim()
+        uptime: (uptime.output || 'unknown').trim(),
+        currentUser: (user.output || 'unknown').trim(),
+        currentDirectory: (pwd.output || '/').trim()
       };
     } finally {
       client.disconnect();
@@ -131,7 +132,7 @@ export class SSHUtils {
   ): Promise<boolean> {
     try {
       const result = await this.executeCommand(connectionOptions, `test -e "${path}"`);
-      return result.success;
+      return result.success ?? (result.exitCode === 0);
     } catch (error) {
       return false;
     }
@@ -162,7 +163,7 @@ export class SSHUtils {
         `stat -c "%F|%s|%A|%U|%Y" "${path}" 2>/dev/null || echo "not_found"`
       );
 
-      if (!result.success || result.output.includes('not_found')) {
+      if (!(result.success ?? (result.exitCode === 0)) || result.output.includes('not_found')) {
         return null;
       }
 
@@ -198,7 +199,7 @@ export class SSHUtils {
     try {
       const command = recursive ? `mkdir -p "${path}"` : `mkdir "${path}"`;
       const result = await this.executeCommand(connectionOptions, command);
-      return result.success;
+      return result.success ?? (result.exitCode === 0);
     } catch (error) {
       return false;
     }
@@ -220,7 +221,7 @@ export class SSHUtils {
     try {
       const command = recursive ? `rm -rf "${path}"` : `rm "${path}"`;
       const result = await this.executeCommand(connectionOptions, command);
-      return result.success;
+      return result.success ?? (result.exitCode === 0);
     } catch (error) {
       return false;
     }
@@ -249,7 +250,7 @@ export class SSHUtils {
         `df -h "${path}" | tail -n 1`
       );
 
-      if (!result.success) {
+      if (!(result.success ?? (result.exitCode === 0))) {
         return null;
       }
 
@@ -291,7 +292,7 @@ export class SSHUtils {
         'ps aux --no-headers | head -20'
       );
 
-      if (!result.success) {
+      if (!(result.success ?? (result.exitCode === 0))) {
         return [];
       }
 

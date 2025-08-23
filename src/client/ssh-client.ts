@@ -35,7 +35,14 @@ export class SSHClient {
    * @param options Connection configuration
    */
   async connect(options: SSHConnectionOptions): Promise<void> {
-    const { hostname, port = 22, username, password, timeout = 30000 } = options;
+    const { hostname, host, port = 22, username, password, timeout = 30000 } = options;
+
+    // Use hostname or host, with proper validation
+    const targetHost = hostname || host;
+    if (!targetHost || !username) {
+      throw new SSHConnectionError('Hostname/host and username are required');
+    }
+
     this.connectionOptions = options;
 
     try {
@@ -47,7 +54,7 @@ export class SSHClient {
       }
 
       // Create socket connection
-      await this.createSocketConnection(hostname, port, timeout);
+      await this.createSocketConnection(targetHost, port, timeout);
 
       // Create SSH session
       this.session = this.lib.libssh2_session_init_ex(null, null, null, null);
@@ -68,6 +75,10 @@ export class SSHClient {
       }
 
       // Authenticate
+      if (!password) {
+        throw new SSHAuthenticationError('Password is required for authentication');
+      }
+
       const authResult = this.lib.libssh2_userauth_password_ex(
         this.session,
         cstr(username),
@@ -108,7 +119,6 @@ export class SSHClient {
       throw new SSHCommandError('Not connected to SSH server');
     }
 
-    const startTime = Date.now();
     const channel = this.lib.libssh2_channel_open_ex(
       this.session,
       cstr('session'),
@@ -140,9 +150,7 @@ export class SSHClient {
       // Optimized output reading
       const output = await this.readChannelOutputOptimized(channel);
       const exitCode = this.lib.libssh2_channel_get_exit_status(channel);
-      
-      const executionTime = Date.now() - startTime;
-      
+
       return {
         output: output.trim(),
         exitCode,

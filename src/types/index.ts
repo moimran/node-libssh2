@@ -11,8 +11,11 @@ import stream from 'stream';
  */
 export interface SSHConnectionOptions {
   /** SSH server hostname or IP address */
-  hostname: string;
-  
+  hostname?: string;
+
+  /** SSH server host (alternative to hostname for node-ssh compatibility) */
+  host?: string;
+
   /** SSH server port (default: 22) */
   port?: number;
   
@@ -37,7 +40,7 @@ export interface CommandResult {
   exitCode: number;
   
   /** Whether command was successful (exitCode === 0) */
-  success: boolean;
+  success?: boolean;
 }
 
 /**
