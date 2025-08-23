@@ -30,18 +30,18 @@
     "compatible"
   ],
   "author": {
-    "name": "AtlasTerminal Team",
-    "email": "contact@atlasterminal.com"
+    "name": "Mohammed Imran",
+    "email": "Postme.imran@gmail.com"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/atlasterminal/node-libssh2.git"
+    "url": "https://github.com/moimran/node-libssh2.git"
   },
   "bugs": {
-    "url": "https://github.com/atlasterminal/node-libssh2/issues"
+    "url": "https://github.com/moimran/node-libssh2/issues"
   },
-  "homepage": "https://github.com/atlasterminal/node-libssh2#readme",
+  "homepage": "https://github.com/moimran/node-libssh2#readme",
   "engines": {
     "node": ">=16.0.0"
   },

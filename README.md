@@ -303,6 +303,6 @@ Contributions welcome! Please read our contributing guidelines and submit pull r
 
 ## Support
 
-- 📖 [Documentation](https://github.com/atlasterminal/node-libssh2/wiki)
-- 🐛 [Issues](https://github.com/atlasterminal/node-libssh2/issues)
-- 💬 [Discussions](https://github.com/atlasterminal/node-libssh2/discussions)
+- 📖 [Documentation](https://github.com/moimran/node-libssh2/wiki)
+- 🐛 [Issues](https://github.com/moimran/node-libssh2/issues)
+- 💬 [Discussions](https://github.com/moimran/node-libssh2/discussions)
