@@ -8,6 +8,7 @@
 import * as koffi from 'koffi';
 import * as path from 'path';
 import * as os from 'os';
+import * as fs from 'fs';
 
 // Type definitions for FFI
 export type Pointer<T> = koffi.IKoffiCType;
@@ -106,13 +107,22 @@ function getLibraryPath(): string {
     return path.join(__dirname, '../../libs/windows/libssh2.dll');
   }
   
-  // On Linux/macOS, try to use system libssh2
+  // On Linux, try bundled library first, then system library
   if (platform === 'linux') {
-    return 'libssh2.so.1';
+    const bundledPath = path.join(__dirname, '../../libs/linux/x64/libssh2.so.1.0.1');
+    if (fs.existsSync(bundledPath)) {
+      return bundledPath;
+    }
+    return 'libssh2.so.1'; // Fallback to system library
   }
-  
+
+  // On macOS, try bundled library first, then system library
   if (platform === 'darwin') {
-    return 'libssh2.dylib';
+    const bundledPath = path.join(__dirname, '../../libs/macos/x64/libssh2.dylib');
+    if (fs.existsSync(bundledPath)) {
+      return bundledPath;
+    }
+    return 'libssh2.dylib'; // Fallback to system library
   }
   
   throw new Error(`Unsupported platform: ${platform} ${arch}`);
