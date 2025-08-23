@@ -5,6 +5,7 @@
  * our optimized libssh2 FFI bindings for superior performance.
  */
 import { SSHClient } from './ssh-client.js';
+import { SSHShell } from './ssh-shell.js';
 import { Config, SSHExecCommandOptions, SSHExecCommandResponse, SSHExecOptions, SSHPutFilesOptions, SSHGetPutDirectoryOptions, FileTransfer } from '../types/index.js';
 /**
  * NodeSSH class providing node-ssh compatible API
@@ -108,22 +109,44 @@ export declare class NodeSSH {
      */
     getDirectory(localDirectory: string, remoteDirectory: string, options?: SSHGetPutDirectoryOptions): Promise<boolean>;
     /**
-     * Request an interactive shell (deprecated - use execCommand for terminal apps)
+     * Request an interactive shell with real-time streaming
      *
-     * @deprecated Use execCommand() instead for better performance in terminal applications
-     * @param options Shell options
-     * @returns Promise that resolves to shell channel
+     * @param options Shell options including terminal dimensions
+     * @returns Promise that resolves to SSHShell instance with event-based streaming
      */
-    requestShell(options?: any): Promise<any>;
+    requestShell(options?: any): Promise<SSHShell>;
     /**
-     * Execute a callback with an interactive shell (deprecated - use execCommand for terminal apps)
+     * Execute a callback with an interactive shell
      *
-     * @deprecated Use execCommand() instead for better performance in terminal applications
      * @param callback Function to execute with shell
      * @param options Shell options
      * @returns Promise that resolves when callback completes
      */
-    withShell(callback: (shell: any) => Promise<void>, options?: any): Promise<void>;
+    withShell(callback: (shell: SSHShell) => Promise<void>, options?: any): Promise<void>;
+    /**
+     * Create a streaming shell for real-time terminal applications
+     *
+     * This method creates an interactive shell with event-based streaming,
+     * perfect for terminal applications like xterm.js
+     *
+     * @param options Shell configuration
+     * @returns Promise that resolves to streaming shell instance
+     */
+    createStreamingShell(options?: {
+        terminalType?: string;
+        cols?: number;
+        rows?: number;
+        width?: number;
+        height?: number;
+    }): Promise<SSHShell>;
+    /**
+     * Resize an existing shell terminal
+     *
+     * @param shell The shell instance to resize
+     * @param cols Number of columns
+     * @param rows Number of rows
+     */
+    resizePty(cols: number, rows: number): Promise<void>;
     /**
      * Request SFTP connection
      *

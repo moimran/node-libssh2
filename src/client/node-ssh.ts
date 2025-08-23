@@ -246,29 +246,76 @@ export class NodeSSH {
   }
 
   /**
-   * Request an interactive shell (deprecated - use execCommand for terminal apps)
+   * Request an interactive shell with real-time streaming
    *
-   * @deprecated Use execCommand() instead for better performance in terminal applications
-   * @param options Shell options
-   * @returns Promise that resolves to shell channel
+   * @param options Shell options including terminal dimensions
+   * @returns Promise that resolves to SSHShell instance with event-based streaming
    */
-  async requestShell(options: any = {}): Promise<any> {
-    throw new SSHError('Interactive shell not supported - use execCommand() for terminal applications like xterm.js');
+  async requestShell(options: any = {}): Promise<SSHShell> {
+    if (!this._connection) {
+      throw new SSHError('Not connected to SSH server');
+    }
+
+    const shell = new SSHShell(this._connection);
+    await shell.start({
+      terminalType: options.terminalType || 'xterm-256color',
+      width: options.cols || options.width || 80,
+      height: options.rows || options.height || 24
+    });
+
+    return shell;
   }
 
   /**
-   * Execute a callback with an interactive shell (deprecated - use execCommand for terminal apps)
+   * Execute a callback with an interactive shell
    *
-   * @deprecated Use execCommand() instead for better performance in terminal applications
    * @param callback Function to execute with shell
    * @param options Shell options
    * @returns Promise that resolves when callback completes
    */
   async withShell(
-    callback: (shell: any) => Promise<void>,
+    callback: (shell: SSHShell) => Promise<void>,
     options: any = {}
   ): Promise<void> {
-    throw new SSHError('Interactive shell not supported - use execCommand() for terminal applications like xterm.js');
+    const shell = await this.requestShell(options);
+
+    try {
+      await callback(shell);
+    } finally {
+      shell.close();
+    }
+  }
+
+  /**
+   * Create a streaming shell for real-time terminal applications
+   *
+   * This method creates an interactive shell with event-based streaming,
+   * perfect for terminal applications like xterm.js
+   *
+   * @param options Shell configuration
+   * @returns Promise that resolves to streaming shell instance
+   */
+  async createStreamingShell(options: {
+    terminalType?: string;
+    cols?: number;
+    rows?: number;
+    width?: number;
+    height?: number;
+  } = {}): Promise<SSHShell> {
+    return this.requestShell(options);
+  }
+
+  /**
+   * Resize an existing shell terminal
+   *
+   * @param shell The shell instance to resize
+   * @param cols Number of columns
+   * @param rows Number of rows
+   */
+  async resizePty(cols: number, rows: number): Promise<void> {
+    // This method will be called on the shell instance directly
+    // We keep this for compatibility but it should be called on the shell
+    throw new SSHError('Use shell.resize(cols, rows) instead');
   }
 
   /**

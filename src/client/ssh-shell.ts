@@ -7,26 +7,45 @@
 import { cstr, isNull } from '../core/ffi.js';
 import { ShellOptions, SSHCommandError, TerminalDimensions } from '../types/index.js';
 import { SSHClient } from './ssh-client.js';
+import { EventEmitter } from 'events';
+import { logger, startTimer, endTimer, createCorrelationId } from '../utils/logger.js';
 
 /**
  * Interactive SSH shell for terminal-like sessions
- * 
+ *
  * Features:
  * - PTY (pseudo-terminal) support
- * - Real-time input/output
+ * - Real-time input/output streaming
  * - Terminal resizing
+ * - Event-based data handling
  * - Proper shell cleanup
+ *
+ * Events:
+ * - 'data': Emitted when data is received from the shell
+ * - 'error': Emitted when an error occurs
+ * - 'close': Emitted when the shell is closed
+ * - 'ready': Emitted when the shell is ready for input
  */
-export class SSHShell {
+export class SSHShell extends EventEmitter {
   private client: SSHClient;
   private channel: any = null;
   private active = false;
   private lib: any = null;
   private currentWidth = 80;
   private currentHeight = 24;
+  private streamingActive = false;
+  private streamingInterval: NodeJS.Timeout | null = null;
+
+  // Logging and performance tracking
+  private correlationId: string;
+  private sessionStartTime: number = 0;
+  private lastCommandTime: number = 0;
 
   constructor(client: SSHClient) {
+    super();
     this.client = client;
+    this.correlationId = createCorrelationId();
+    logger.info('SSHShell', 'Shell instance created', { correlationId: this.correlationId });
   }
 
   /**
@@ -35,17 +54,27 @@ export class SSHShell {
    * @param options Shell configuration options
    */
   async start(options: ShellOptions = {}): Promise<void> {
+    const startTimerId = startTimer('SSHShell', 'start', this.correlationId);
+    this.sessionStartTime = performance.now();
+
+    logger.info('SSHShell', 'Starting shell session', { options, correlationId: this.correlationId });
+
     if (!this.client.isConnected()) {
+      logger.error('SSHShell', 'SSH client not connected', {}, this.correlationId);
       throw new SSHCommandError('SSH client not connected');
     }
 
     const { terminalType = 'xterm', width = 80, height = 24 } = options;
+    logger.debug('SSHShell', 'Shell options configured', { terminalType, width, height }, this.correlationId);
 
     // Access private members for shell operations
     this.lib = (this.client as any).lib;
     const session = (this.client as any).session;
 
     // Open channel
+    const channelTimerId = startTimer('SSHShell', 'open-channel', this.correlationId);
+    logger.debug('SSHShell', 'Opening SSH channel', {}, this.correlationId);
+
     this.channel = this.lib.libssh2_channel_open_ex(
       session,
       cstr('session'),
@@ -57,11 +86,19 @@ export class SSHShell {
     );
 
     if (!this.channel || isNull(this.channel)) {
+      endTimer(channelTimerId, { success: false });
+      logger.error('SSHShell', 'Failed to open shell channel', {}, this.correlationId);
       throw new SSHCommandError('Failed to open shell channel');
     }
 
+    endTimer(channelTimerId, { success: true });
+    logger.debug('SSHShell', 'SSH channel opened successfully', {}, this.correlationId);
+
     try {
       // Request PTY
+      const ptyTimerId = startTimer('SSHShell', 'request-pty', this.correlationId);
+      logger.debug('SSHShell', 'Requesting PTY', { terminalType, width, height }, this.correlationId);
+
       const ptyResult = this.lib.libssh2_channel_request_pty_ex(
         this.channel,
         cstr(terminalType),
@@ -75,10 +112,18 @@ export class SSHShell {
       );
 
       if (ptyResult !== 0) {
+        endTimer(ptyTimerId, { success: false, result: ptyResult });
+        logger.error('SSHShell', 'Failed to request PTY', { result: ptyResult }, this.correlationId);
         throw new SSHCommandError(`Failed to request PTY: ${ptyResult}`);
       }
 
+      endTimer(ptyTimerId, { success: true });
+      logger.debug('SSHShell', 'PTY requested successfully', {}, this.correlationId);
+
       // Start shell
+      const shellTimerId = startTimer('SSHShell', 'start-shell-process', this.correlationId);
+      logger.debug('SSHShell', 'Starting shell process', {}, this.correlationId);
+
       const shellResult = this.lib.libssh2_channel_process_startup(
         this.channel,
         cstr('shell'),
@@ -88,14 +133,40 @@ export class SSHShell {
       );
 
       if (shellResult !== 0) {
+        endTimer(shellTimerId, { success: false, result: shellResult });
+        logger.error('SSHShell', 'Failed to start shell', { result: shellResult }, this.correlationId);
         throw new SSHCommandError(`Failed to start shell: ${shellResult}`);
       }
+
+      endTimer(shellTimerId, { success: true });
+      logger.debug('SSHShell', 'Shell process started successfully', {}, this.correlationId);
+
+      // Set session to non-blocking mode to prevent event loop blocking
+      const session = this.client.getSession();
+      this.lib.libssh2_session_set_blocking(session, 0);
+      logger.debug('SSHShell', 'Session set to non-blocking mode', {}, this.correlationId);
 
       // Store initial dimensions
       this.currentWidth = width;
       this.currentHeight = height;
       this.active = true;
+
+      logger.debug('SSHShell', 'Shell setup complete, starting data streaming', {}, this.correlationId);
+
+      // Start data streaming immediately (no delay needed with non-blocking mode)
+      this.startStreaming();
+
+      // Emit ready event after streaming is set up
+      this.emit('ready');
+      endTimer(startTimerId, { success: true });
+      logger.info('SSHShell', 'Shell session started successfully', {
+        totalTime: `${(performance.now() - this.sessionStartTime).toFixed(2)}ms`
+      }, this.correlationId);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      endTimer(startTimerId, { success: false, error: errorMessage });
+      logger.error('SSHShell', 'Failed to start shell session', { error: errorMessage }, this.correlationId);
+
       // Cleanup on failure
       if (this.channel) {
         this.lib.libssh2_channel_close(this.channel);
@@ -107,30 +178,212 @@ export class SSHShell {
   }
 
   /**
-   * Send input to the shell
-   * 
+   * Start data streaming with on-demand reading (no continuous polling)
+   */
+  private startStreaming(): void {
+    if (this.streamingActive) {
+      logger.debug('SSHShell', 'Data streaming already active', {}, this.correlationId);
+      return;
+    }
+
+    logger.info('SSHShell', 'Starting data streaming', {}, this.correlationId);
+    this.streamingActive = true;
+
+    // Perform initial read to get any available data
+    this.performSingleRead();
+  }
+
+  /**
+   * Perform a single read operation to check for available data
+   * This is called on-demand rather than in a continuous loop
+   */
+  private performSingleRead(): void {
+    if (!this.streamingActive || !this.active || !this.channel) {
+      return;
+    }
+
+    try {
+      // Read all available data in a single operation
+      let hasMoreData = true;
+      let readCount = 0;
+      const maxReads = 10; // Prevent infinite loops
+
+      while (hasMoreData && readCount < maxReads) {
+        hasMoreData = this.readAvailableData();
+        readCount++;
+      }
+    } catch (error) {
+      console.error('SSH Shell: Data read error:', error);
+      this.emit('error', error);
+      this.stopStreaming();
+    }
+  }
+
+  /**
+   * Trigger a read operation (called after write operations to check for responses)
+   */
+  public triggerRead(): void {
+    if (this.streamingActive) {
+      // Use setImmediate to avoid blocking the current operation
+      setImmediate(() => this.performSingleRead());
+    }
+  }
+
+  /**
+   * Stop data streaming
+   */
+  private stopStreaming(): void {
+    this.streamingActive = false;
+    if (this.streamingInterval) {
+      clearTimeout(this.streamingInterval);
+      this.streamingInterval = null;
+    }
+  }
+
+  /**
+   * Read available data with robust error handling
+   * @returns true if data was read, false otherwise
+   */
+  public readAvailableData(): boolean {
+    if (!this.active || !this.channel || !this.streamingActive) {
+      return false;
+    }
+
+    try {
+      const buffer = Buffer.alloc(4096);
+      const readStartTime = performance.now();
+      const bytesRead = this.lib.libssh2_channel_read_ex(this.channel, 0, buffer, buffer.length);
+      const readDuration = performance.now() - readStartTime;
+
+      if (bytesRead > 0) {
+        const data = buffer.subarray(0, Number(bytesRead)).toString();
+        const timestamp = new Date().toISOString().substring(11, 23); // HH:mm:ss.SSS
+
+        // Check if this looks like a command response (contains prompt)
+        const containsPrompt = data.includes('# ') || data.includes('$ ') ||
+                             data.includes('root@') || data.includes('~#');
+
+        if (containsPrompt) {
+          console.log(`📥 SSH RESPONSE [${timestamp}]: Command completed! (${bytesRead} bytes, ${readDuration.toFixed(2)}ms)`);
+          console.log(`    Preview: "${data.substring(0, 100).replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
+        } else {
+          console.log(`📥 SSH DATA [${timestamp}]: ${bytesRead} bytes received (${readDuration.toFixed(2)}ms)`);
+          console.log(`    Preview: "${data.substring(0, 50).replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
+        }
+
+        logger.logDataFlow('SSHShell', 'IN', bytesRead, {
+          readDuration: `${readDuration.toFixed(2)}ms`,
+          preview: data.substring(0, 50).replace(/\n/g, '\\n')
+        }, this.correlationId);
+
+        this.emit('data', data);
+        return true; // Data was read
+      } else if (bytesRead === 0) {
+        // EOF - shell closed
+        logger.info('SSHShell', 'Shell closed (EOF)', {}, this.correlationId);
+        this.emit('close');
+        this.stopStreaming();
+        return false;
+      } else if (bytesRead === -37 || bytesRead === -9) {
+        // EAGAIN (-37) or EWOULDBLOCK (-9) - no data available right now, this is normal
+        logger.trace('SSHShell', 'No data available (EAGAIN/EWOULDBLOCK)', {
+          bytesRead,
+          readDuration: `${readDuration.toFixed(2)}ms`
+        }, this.correlationId);
+        return false; // No data available
+      } else if (bytesRead < 0) {
+        // Other libssh2 errors - log occasionally for debugging
+        if (Math.random() < 0.001) { // Log 0.1% of the time to avoid spam
+          logger.debug('SSHShell', 'Read error (libssh2)', {
+            bytesRead,
+            readDuration: `${readDuration.toFixed(2)}ms`
+          }, this.correlationId);
+        }
+        return false; // No data due to error
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('SSHShell', 'Exception in readAvailableData', { error: errorMessage }, this.correlationId);
+      this.emit('error', error);
+      this.stopStreaming();
+      return false;
+    }
+
+    return false;
+  }
+
+  /**
+   * Send input to the shell (synchronous, non-blocking)
+   *
    * @param data Data to send to shell
    * @returns Number of bytes written
    */
-  async write(data: string): Promise<number> {
+  write(data: string): number {
     if (!this.active || !this.channel) {
-      throw new SSHCommandError('Shell not active');
+      console.log(`❌ SSH WRITE FAILED: Shell not active (data: "${data.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}")`);
+      return 0;
     }
 
-    const buffer = Buffer.from(data, 'utf8');
-    
-    const bytesWritten = this.lib.libssh2_channel_write_ex(
-      this.channel,
-      0,
-      buffer,
-      buffer.length
-    );
+    const writeTimerId = startTimer('SSHShell', 'write-data', this.correlationId);
+    this.lastCommandTime = performance.now();
 
-    if (bytesWritten < 0) {
-      throw new SSHCommandError(`Failed to write to shell: ${bytesWritten}`);
+    // Enhanced logging for SSH command sending
+    const isEnterKey = data === '\r' || data === '\n' || data === '\r\n';
+    const timestamp = new Date().toISOString().substring(11, 23); // HH:mm:ss.SSS
+
+    if (isEnterKey) {
+      console.log(`🚀 SSH COMMAND EXECUTION [${timestamp}]: Sending Enter key to execute command`);
+    } else if (data.charCodeAt(0) < 32) {
+      console.log(`⌨️  SSH CONTROL KEY [${timestamp}]: Sending control character (code: ${data.charCodeAt(0)})`);
+    } else {
+      console.log(`📝 SSH INPUT [${timestamp}]: "${data}" (${data.length} bytes)`);
     }
 
-    return Number(bytesWritten);
+    try {
+      const buffer = Buffer.from(data, 'utf8');
+      logger.logDataFlow('SSHShell', 'OUT', buffer.length, {
+        preview: data.replace(/\n/g, '\\n').replace(/\r/g, '\\r')
+      }, this.correlationId);
+
+      console.log(`📡 SSH WRITE START [${timestamp}]: Calling libssh2_channel_write_ex with ${buffer.length} bytes`);
+
+      const writeStartTime = performance.now();
+      const bytesWritten = this.lib.libssh2_channel_write_ex(
+        this.channel,
+        0,
+        buffer,
+        buffer.length
+      );
+      const writeDuration = performance.now() - writeStartTime;
+
+      if (bytesWritten < 0) {
+        console.log(`❌ SSH WRITE FAILED [${timestamp}]: libssh2_channel_write_ex returned ${bytesWritten} (${writeDuration.toFixed(2)}ms)`);
+        endTimer(writeTimerId, { success: false, bytesWritten, writeDuration: `${writeDuration.toFixed(2)}ms` });
+        logger.warn('SSHShell', 'Write operation failed', {
+          bytesWritten,
+          writeDuration: `${writeDuration.toFixed(2)}ms`,
+          data: data.substring(0, 50)
+        }, this.correlationId);
+        return 0;
+      }
+
+      console.log(`✅ SSH WRITE SUCCESS [${timestamp}]: ${bytesWritten} bytes written to SSH channel (${writeDuration.toFixed(2)}ms)`);
+      endTimer(writeTimerId, { success: true, bytesWritten, writeDuration: `${writeDuration.toFixed(2)}ms` });
+      logger.debug('SSHShell', 'Data written successfully', {
+        bytesWritten,
+        writeDuration: `${writeDuration.toFixed(2)}ms`
+      }, this.correlationId);
+
+      // Trigger a read to check for immediate response (like Python bindings approach)
+      this.triggerRead();
+
+      return Number(bytesWritten);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      endTimer(writeTimerId, { success: false, error: errorMessage });
+      logger.error('SSHShell', 'Exception in write', { error: errorMessage }, this.correlationId);
+      return 0;
+    }
   }
 
   /**
@@ -243,7 +496,7 @@ export class SSHShell {
     }
 
     // Send command
-    await this.write(command + '\n');
+    this.write(command + '\n');
 
     // Read output with smart prompt detection
     return await this.readUntilPrompt(timeoutMs);
@@ -398,12 +651,12 @@ export class SSHShell {
       case 'INT':
       case 'SIGINT':
         // Send Ctrl+C
-        await this.write('\x03');
+        this.write('\x03');
         break;
       case 'TERM':
       case 'SIGTERM':
         // Send exit command
-        await this.write('exit\n');
+        this.write('exit\n');
         break;
       default:
         throw new SSHCommandError(`Signal ${signal} not supported`);
@@ -436,6 +689,9 @@ export class SSHShell {
    * Close the shell session (optimized)
    */
   close(): void {
+    // Stop streaming first
+    this.stopStreaming();
+
     if (this.channel && this.active && this.lib) {
       try {
         // Send exit command to gracefully close shell
@@ -456,6 +712,9 @@ export class SSHShell {
 
       this.channel = null;
       this.active = false;
+
+      // Emit close event
+      this.emit('close');
     }
   }
 }

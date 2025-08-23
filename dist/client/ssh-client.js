@@ -208,6 +208,12 @@ class SSHClient {
         return this.connectionOptions;
     }
     /**
+     * Get the SSH session (for internal use by SSH components)
+     */
+    getSession() {
+        return this.session;
+    }
+    /**
      * Disconnect from SSH server and cleanup all resources
      */
     disconnect() {

@@ -51,6 +51,10 @@ export declare class SSHClient {
      */
     getConnectionInfo(): SSHConnectionOptions | null;
     /**
+     * Get the SSH session (for internal use by SSH components)
+     */
+    getSession(): any;
+    /**
      * Disconnect from SSH server and cleanup all resources
      */
     disconnect(): void;

@@ -5,22 +5,35 @@
  */
 import { ShellOptions, TerminalDimensions } from '../types/index.js';
 import { SSHClient } from './ssh-client.js';
+import { EventEmitter } from 'events';
 /**
  * Interactive SSH shell for terminal-like sessions
  *
  * Features:
  * - PTY (pseudo-terminal) support
- * - Real-time input/output
+ * - Real-time input/output streaming
  * - Terminal resizing
+ * - Event-based data handling
  * - Proper shell cleanup
+ *
+ * Events:
+ * - 'data': Emitted when data is received from the shell
+ * - 'error': Emitted when an error occurs
+ * - 'close': Emitted when the shell is closed
+ * - 'ready': Emitted when the shell is ready for input
  */
-export declare class SSHShell {
+export declare class SSHShell extends EventEmitter {
     private client;
     private channel;
     private active;
     private lib;
     private currentWidth;
     private currentHeight;
+    private streamingActive;
+    private streamingInterval;
+    private correlationId;
+    private sessionStartTime;
+    private lastCommandTime;
     constructor(client: SSHClient);
     /**
      * Start an interactive shell session
@@ -29,12 +42,34 @@ export declare class SSHShell {
      */
     start(options?: ShellOptions): Promise<void>;
     /**
-     * Send input to the shell
+     * Start data streaming with on-demand reading (no continuous polling)
+     */
+    private startStreaming;
+    /**
+     * Perform a single read operation to check for available data
+     * This is called on-demand rather than in a continuous loop
+     */
+    private performSingleRead;
+    /**
+     * Trigger a read operation (called after write operations to check for responses)
+     */
+    triggerRead(): void;
+    /**
+     * Stop data streaming
+     */
+    private stopStreaming;
+    /**
+     * Read available data with robust error handling
+     * @returns true if data was read, false otherwise
+     */
+    readAvailableData(): boolean;
+    /**
+     * Send input to the shell (synchronous, non-blocking)
      *
      * @param data Data to send to shell
      * @returns Number of bytes written
      */
-    write(data: string): Promise<number>;
+    write(data: string): number;
     /**
      * Read output from the shell (optimized for speed)
      *

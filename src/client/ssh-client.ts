@@ -219,6 +219,13 @@ export class SSHClient {
   }
 
   /**
+   * Get the SSH session (for internal use by SSH components)
+   */
+  getSession(): any {
+    return this.session;
+  }
+
+  /**
    * Disconnect from SSH server and cleanup all resources
    */
   disconnect(): void {
