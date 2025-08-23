@@ -1,0 +1,34 @@
+# Development files
+development/
+src/
+tsconfig.json
+.git/
+.gitignore
+
+# Build artifacts
+*.log
+*.tmp
+*.temp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+test/
+tests/
+*.test.js
+*.spec.js
+
+# Documentation source
+docs/
+*.md.backup
+
+# Node modules (should not be in package anyway)
+node_modules/
