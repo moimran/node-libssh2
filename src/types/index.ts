@@ -1,6 +1,10 @@
 /**
  * Type definitions for node-libssh2
+ *
+ * Includes both original API types and node-ssh compatible types
  */
+
+import stream from 'stream';
 
 /**
  * SSH connection configuration options
@@ -111,13 +115,18 @@ export interface LibraryInfo {
  * Error types that can be thrown by the library
  */
 export class SSHError extends Error {
+  code: string | number | null;
+  errno?: number;
+
   constructor(
     message: string,
-    public readonly code?: number,
-    public readonly errno?: number
+    code?: string | number | null,
+    errno?: number
   ) {
     super(message);
     this.name = 'SSHError';
+    this.code = code || null;
+    this.errno = errno;
   }
 }
 
@@ -199,3 +208,116 @@ export interface AdvancedSSHOptions extends SSHConnectionOptions {
   /** Preferred key exchange algorithms */
   kex?: string[];
 }
+
+// ============================================================================
+// Node-SSH Compatible API Types
+// ============================================================================
+
+/**
+ * Configuration for NodeSSH connection (node-ssh compatible)
+ */
+export interface Config extends SSHConnectionOptions {
+  /** SSH server host */
+  host?: string;
+
+  /** Private key as string or Buffer */
+  privateKey?: string | Buffer;
+
+  /** Path to private key file */
+  privateKeyPath?: string;
+
+  /** Enable keyboard-interactive authentication */
+  tryKeyboard?: boolean;
+
+  /** Keyboard-interactive authentication handler */
+  onKeyboardInteractive?: (
+    name: string,
+    instructions: string,
+    lang: string,
+    prompts: Array<{ prompt: string; echo: boolean }>,
+    finish: (responses: string[]) => void,
+  ) => void;
+}
+
+/**
+ * Options for execCommand method
+ */
+export interface SSHExecCommandOptions {
+  /** Working directory for command execution */
+  cwd?: string;
+
+  /** Input to send to command stdin */
+  stdin?: string | stream.Readable;
+
+  /** Text encoding for output */
+  encoding?: BufferEncoding;
+
+  /** Don't trim whitespace from output */
+  noTrim?: boolean;
+
+  /** Callback for stdout chunks */
+  onStdout?: (chunk: Buffer) => void;
+
+  /** Callback for stderr chunks */
+  onStderr?: (chunk: Buffer) => void;
+}
+
+/**
+ * Response from execCommand method
+ */
+export interface SSHExecCommandResponse {
+  /** Standard output */
+  stdout: string;
+
+  /** Standard error */
+  stderr: string;
+
+  /** Exit code (null if not available) */
+  code: number | null;
+
+  /** Signal that terminated the process (null if not available) */
+  signal: string | null;
+}
+
+/**
+ * Options for exec method
+ */
+export interface SSHExecOptions extends SSHExecCommandOptions {
+  /** Which stream to return ('stdout', 'stderr', or 'both') */
+  stream?: 'stdout' | 'stderr' | 'both';
+}
+
+/**
+ * Options for putFiles method
+ */
+export interface SSHPutFilesOptions {
+  /** Number of concurrent transfers */
+  concurrency?: number;
+}
+
+/**
+ * Options for putDirectory and getDirectory methods
+ */
+export interface SSHGetPutDirectoryOptions extends SSHPutFilesOptions {
+  /** Progress callback */
+  tick?: (localFile: string, remoteFile: string, error: Error | null) => void;
+
+  /** File validation callback */
+  validate?: (path: string) => boolean;
+
+  /** Enable recursive directory transfer */
+  recursive?: boolean;
+}
+
+/**
+ * File transfer specification
+ */
+export interface FileTransfer {
+  /** Local file path */
+  local: string;
+
+  /** Remote file path */
+  remote: string;
+}
+
+

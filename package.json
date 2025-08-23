@@ -1,7 +1,7 @@
 {
   "name": "node-libssh2",
   "version": "1.0.0",
-  "description": "High-performance SSH client for Node.js using libssh2 with native FFI bindings",
+  "description": "High-performance SSH client for Node.js with node-ssh compatible API using libssh2 native FFI bindings",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -9,18 +9,26 @@
     "clean": "rimraf dist",
     "prepublishOnly": "npm run clean && npm run build",
     "test": "node examples/test.js",
-    "example": "node examples/basic.js"
+    "example": "node examples/basic.js",
+    "example:node-ssh": "node examples/node-ssh-api.js",
+    "example:comparison": "node examples/api-comparison.js",
+    "example:interactive": "node examples/interactive.js",
+    "example:performance": "node examples/performance.js"
   },
   "keywords": [
     "ssh",
     "ssh2",
     "libssh2",
+    "node-ssh",
     "terminal",
     "remote",
     "shell",
     "ffi",
     "native",
-    "high-performance"
+    "high-performance",
+    "promises",
+    "async",
+    "compatible"
   ],
   "author": {
     "name": "AtlasTerminal Team",
