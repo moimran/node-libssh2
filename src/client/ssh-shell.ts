@@ -250,7 +250,7 @@ export class SSHShell extends EventEmitter {
     }
 
     try {
-      const buffer = Buffer.alloc(4096);
+      const buffer = Buffer.alloc(65536);
       const readStartTime = performance.now();
       const bytesRead = this.lib.libssh2_channel_read_ex(this.channel, 0, buffer, buffer.length);
       const readDuration = performance.now() - readStartTime;
@@ -479,6 +479,104 @@ export class SSHShell extends EventEmitter {
         break;
       }
     }
+
+    return output;
+  }
+
+  /**
+   * Read output from a long-running command with real-time streaming
+   *
+   * This method is designed for commands that may take minutes to complete
+   * and provides real-time output streaming with progress callbacks.
+   *
+   * @param maxWaitMs Maximum time to wait for command completion (default: 10 minutes)
+   * @param onData Callback for real-time data streaming
+   * @param promptPattern Pattern to detect command completion (default: shell prompt)
+   * @returns Complete output from the long-running command
+   */
+  async readLongRunningCommand(
+    maxWaitMs = 600000, // 10 minutes default
+    onData?: (chunk: string) => void,
+    promptPattern = /[#$%>]\s*$/
+  ): Promise<string> {
+    if (!this.active || !this.channel) {
+      throw new SSHCommandError('Shell not active');
+    }
+
+    const buffer = Buffer.alloc(65536); // Large buffer for long output
+    let output = '';
+    let lastDataTime = Date.now();
+    const startTime = Date.now();
+    let consecutiveEmptyReads = 0;
+
+    logger.info('SSHShell', 'Starting long-running command read', {
+      maxWaitMs,
+      hasCallback: !!onData
+    }, this.correlationId);
+
+    while (Date.now() - startTime < maxWaitMs) {
+      const bytesRead = this.lib.libssh2_channel_read_ex(this.channel, 0, buffer, buffer.length);
+
+      if (bytesRead > 0) {
+        const chunk = buffer.subarray(0, Number(bytesRead)).toString();
+        output += chunk;
+        lastDataTime = Date.now();
+        consecutiveEmptyReads = 0;
+
+        // Call real-time callback if provided
+        if (onData) {
+          onData(chunk);
+        }
+
+        // Check if we've reached a shell prompt (command completed)
+        if (promptPattern.test(output)) {
+          logger.debug('SSHShell', 'Command completion detected via prompt pattern', {
+            outputLength: output.length,
+            duration: Date.now() - startTime
+          }, this.correlationId);
+          break;
+        }
+
+        // Continue immediately if we got data
+        continue;
+      } else if (bytesRead === 0) {
+        // EOF - command completed
+        logger.debug('SSHShell', 'Command completion detected via EOF', {
+          outputLength: output.length,
+          duration: Date.now() - startTime
+        }, this.correlationId);
+        break;
+      } else if (bytesRead === -37) {
+        // EAGAIN - no data available
+        consecutiveEmptyReads++;
+
+        // For long-running commands, be more patient
+        // Only break if no data for 5 seconds and we have some output
+        if (Date.now() - lastDataTime > 5000 && output.length > 0 && consecutiveEmptyReads > 100) {
+          logger.debug('SSHShell', 'Command timeout - no data for 5 seconds', {
+            outputLength: output.length,
+            duration: Date.now() - startTime
+          }, this.correlationId);
+          break;
+        }
+
+        // Longer delay for long-running commands to reduce CPU usage
+        await new Promise(resolve => setTimeout(resolve, 50));
+      } else {
+        // Error
+        logger.error('SSHShell', 'Read error in long-running command', {
+          error: bytesRead,
+          outputLength: output.length
+        }, this.correlationId);
+        break;
+      }
+    }
+
+    logger.info('SSHShell', 'Long-running command read completed', {
+      outputLength: output.length,
+      duration: Date.now() - startTime,
+      timedOut: Date.now() - startTime >= maxWaitMs
+    }, this.correlationId);
 
     return output;
   }

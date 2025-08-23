@@ -164,6 +164,37 @@ async function interactiveShellDemo() {
     console.log('📤 Memory info:');
     console.log(memoryOutput);
 
+    // Demonstrate long-running command capability
+    console.log('⏳ Long-Running Command Demo');
+    console.log('============================');
+    console.log('💻 Executing: time find /usr/bin -name "*ssh*" 2>/dev/null');
+    console.log('📊 This shows real-time output for longer commands...\n');
+
+    await shell.write('time find /usr/bin -name "*ssh*" 2>/dev/null\n');
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    let foundCount = 0;
+    const longOutput = await shell.readLongRunningCommand(
+      30000, // 30 seconds timeout
+      (chunk) => {
+        // Real-time callback to show progress
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (line.trim() && line.startsWith('/') && !line.includes('root@')) {
+            foundCount++;
+            console.log(`🔍 Found [${foundCount}]: ${line.trim()}`);
+          }
+        }
+      }
+    );
+
+    console.log(`✅ Long-running command completed! Found ${foundCount} SSH-related files.\n`);
+
+    // Note about very long commands
+    console.log('� NOTE: For very long commands like "find / -type f", use:');
+    console.log('   const output = await shell.readLongRunningCommand(600000, onDataCallback);');
+    console.log('   This supports commands that take minutes to complete!\n');
+
     // Graceful exit
     console.log('👋 Gracefully exiting shell...');
     await shell.write('exit\n');

@@ -88,6 +88,19 @@ export declare class SSHShell extends EventEmitter {
      */
     readUntilComplete(maxWaitMs?: number): Promise<string>;
     /**
+     * Read output from a long-running command with real-time streaming
+     *
+     * This method is designed for commands that may take minutes to complete
+     * and provides real-time output streaming with progress callbacks.
+     *
+     * @param maxWaitMs Maximum time to wait for command completion (default: 10 minutes)
+     * @param onData Callback for real-time data streaming
+     * @param promptPattern Pattern to detect command completion (default: shell prompt)
+     * @returns Complete output from the long-running command
+     */
+    readLongRunningCommand(maxWaitMs?: number, // 10 minutes default
+    onData?: (chunk: string) => void, promptPattern?: RegExp): Promise<string>;
+    /**
      * Execute a command and read its output quickly (optimized for speed)
      *
      * @param command Command to execute
