@@ -30,8 +30,6 @@ export class SSHTerminal {
    * Start the terminal session
    */
   async start(options: SSHTerminalOptions = {}): Promise<void> {
-    console.log('🔍 SSHTerminal: start() method called - IMPLEMENTING ASYNC-SSH2-LITE APPROACH');
-
     if (this.isActive) {
       throw new SSHError('Terminal is already active');
     }
@@ -45,44 +43,29 @@ export class SSHTerminal {
     } = options;
 
     try {
-      console.log('🔍 SSHTerminal: Getting session...');
       const session = this.client.getSession();
-      console.log('🔍 SSHTerminal: Session obtained');
 
-      console.log('🔍 SSHTerminal: Opening session channel with async retry pattern...');
       // Open channel with async retry pattern (inspired by async-ssh2-lite)
       const rawChannel = await this.openSessionAsync(session);
-      console.log('🔍 SSHTerminal: Session channel opened successfully (non-blocking)');
 
       if (!rawChannel) {
         throw new SSHError('Failed to open SSH channel');
       }
 
-      console.log('🔍 SSHTerminal: Creating Channel wrapper...');
       this.channel = new Channel(rawChannel, session['lib']);
-      console.log('🔍 SSHTerminal: Channel wrapper created');
-
       this.dimensions = { cols, rows };
-
-      console.log('🔍 SSHTerminal: Setting environment variables...');
       // Set environment variables
       for (const [key, value] of Object.entries(env)) {
         this.channel.setenv(key, value);
       }
-      console.log('🔍 SSHTerminal: Environment variables set');
 
-      console.log('🔍 SSHTerminal: Requesting PTY with async retry pattern...');
       // Request PTY with async retry pattern
       await this.requestPtyAsync(term, modes, cols, rows);
-      console.log('🔍 SSHTerminal: PTY request completed successfully (non-blocking)');
 
-      console.log('🔍 SSHTerminal: Starting shell with async retry pattern...');
       // Start shell with async retry pattern
       await this.startShellAsync();
-      console.log('🔍 SSHTerminal: Shell start completed successfully (non-blocking)');
 
       this.isActive = true;
-      console.log('🔍 SSHTerminal: Terminal is now active');
     } catch (error) {
       await this.cleanup();
       throw error instanceof SSHError ? error : new SSHError(`Failed to start terminal: ${error instanceof Error ? error.message : String(error)}`);
@@ -94,20 +77,15 @@ export class SSHTerminal {
    * This prevents blocking by yielding control when the operation would block
    */
   private async openSessionAsync(session: any): Promise<any> {
-    console.log('🔍 SSHTerminal: Starting async session open with retry pattern');
-
     return new Promise((resolve, reject) => {
       const attemptOpen = () => {
         try {
-          console.log('🔍 SSHTerminal: Attempting to open session (non-blocking)...');
           const channel = session.openSession();
 
           if (channel) {
-            console.log('🔍 SSHTerminal: Session opened successfully on attempt');
             resolve(channel);
           } else {
             // Channel creation failed, but not due to blocking - retry with delay
-            console.log('🔍 SSHTerminal: Session open returned null, retrying...');
             setImmediate(attemptOpen);
           }
         } catch (error: any) {
@@ -118,11 +96,9 @@ export class SSHTerminal {
             error.message.includes('try again') ||
             error.code === 'EAGAIN'
           )) {
-            console.log('🔍 SSHTerminal: Operation would block, yielding and retrying...');
             // Yield control back to event loop and retry (async-ssh2-lite pattern)
             setImmediate(attemptOpen);
           } else {
-            console.log('🔍 SSHTerminal: Session open failed with error:', error);
             reject(error);
           }
         }
@@ -137,19 +113,14 @@ export class SSHTerminal {
    * Request PTY with async retry pattern (inspired by async-ssh2-lite)
    */
   private async requestPtyAsync(term: string, modes: string, cols: number, rows: number): Promise<void> {
-    console.log('🔍 SSHTerminal: Starting async PTY request with retry pattern');
-
     return new Promise((resolve, reject) => {
       const attemptPty = () => {
         try {
-          console.log('🔍 SSHTerminal: Attempting PTY request (non-blocking)...');
           const result = this.channel!.ptyEx(term, modes, cols, rows);
 
           if (result === 0) {
-            console.log('🔍 SSHTerminal: PTY request successful');
             resolve();
           } else if (result === -37) { // EAGAIN equivalent
-            console.log('🔍 SSHTerminal: PTY request would block, yielding and retrying...');
             setImmediate(attemptPty);
           } else {
             reject(new SSHError(`Failed to request PTY: ${result}`));
@@ -160,7 +131,6 @@ export class SSHTerminal {
             error.message.includes('EAGAIN') ||
             error.message.includes('try again')
           )) {
-            console.log('🔍 SSHTerminal: PTY request would block, yielding and retrying...');
             setImmediate(attemptPty);
           } else {
             reject(error);
@@ -176,19 +146,14 @@ export class SSHTerminal {
    * Start shell with async retry pattern (inspired by async-ssh2-lite)
    */
   private async startShellAsync(): Promise<void> {
-    console.log('🔍 SSHTerminal: Starting async shell start with retry pattern');
-
     return new Promise((resolve, reject) => {
       const attemptShell = () => {
         try {
-          console.log('🔍 SSHTerminal: Attempting shell start (non-blocking)...');
           const result = this.channel!.shell();
 
           if (result === 0) {
-            console.log('🔍 SSHTerminal: Shell start successful');
             resolve();
           } else if (result === -37) { // EAGAIN equivalent
-            console.log('🔍 SSHTerminal: Shell start would block, yielding and retrying...');
             setImmediate(attemptShell);
           } else {
             reject(new SSHError(`Failed to start shell: ${result}`));
@@ -199,7 +164,6 @@ export class SSHTerminal {
             error.message.includes('EAGAIN') ||
             error.message.includes('try again')
           )) {
-            console.log('🔍 SSHTerminal: Shell start would block, yielding and retrying...');
             setImmediate(attemptShell);
           } else {
             reject(error);

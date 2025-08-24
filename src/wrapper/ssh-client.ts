@@ -55,15 +55,12 @@ export class SSHClient {
       this.session = new Session();
 
       // Enable non-blocking mode (inspired by async-ssh2-lite)
-      console.log('🔍 SSHClient: Enabling non-blocking mode for async operations');
       this.session.setBlocking(false);
 
       this.state = ConnectionState.CONNECTED;
 
       // Perform handshake with async retry pattern
-      console.log('🔍 SSHClient: Starting async handshake...');
       await this.performHandshakeAsync(nativeSocket);
-      console.log('🔍 SSHClient: Handshake completed successfully (non-blocking)');
 
       // Authenticate
       this.state = ConnectionState.AUTHENTICATING;
@@ -81,19 +78,14 @@ export class SSHClient {
    * Perform SSH handshake with async retry pattern (inspired by async-ssh2-lite)
    */
   private async performHandshakeAsync(socket: any): Promise<void> {
-    console.log('🔍 SSHClient: Starting async handshake with retry pattern');
-
     return new Promise((resolve, reject) => {
       const attemptHandshake = () => {
         try {
-          console.log('🔍 SSHClient: Attempting handshake (non-blocking)...');
           const result = this.session!.handshake(socket);
 
           if (result === 0) {
-            console.log('🔍 SSHClient: Handshake successful');
             resolve();
           } else if (result === -37) { // EAGAIN equivalent
-            console.log('🔍 SSHClient: Handshake would block, yielding and retrying...');
             setImmediate(attemptHandshake);
           } else {
             reject(new SSHError(`SSH handshake failed: ${result}`));
@@ -104,7 +96,6 @@ export class SSHClient {
             error.message.includes('EAGAIN') ||
             error.message.includes('try again')
           )) {
-            console.log('🔍 SSHClient: Handshake would block, yielding and retrying...');
             setImmediate(attemptHandshake);
           } else {
             reject(error);
@@ -160,14 +151,10 @@ export class SSHClient {
 
     if (privateKeyPath) {
       // Public key authentication with async retry
-      console.log('🔍 SSHClient: Starting async public key authentication...');
       await this.authenticatePublicKeyAsync(username, privateKeyPath, passphrase || '');
-      console.log('🔍 SSHClient: Public key authentication completed successfully (non-blocking)');
     } else if (password) {
       // Password authentication with async retry
-      console.log('🔍 SSHClient: Starting async password authentication...');
       await this.authenticatePasswordAsync(username, password);
-      console.log('🔍 SSHClient: Password authentication completed successfully (non-blocking)');
     } else {
       throw new SSHError('No authentication method provided');
     }
@@ -177,19 +164,14 @@ export class SSHClient {
    * Authenticate with password using async retry pattern (inspired by async-ssh2-lite)
    */
   private async authenticatePasswordAsync(username: string, password: string): Promise<void> {
-    console.log('🔍 SSHClient: Starting async password auth with retry pattern');
-
     return new Promise((resolve, reject) => {
       const attemptAuth = () => {
         try {
-          console.log('🔍 SSHClient: Attempting password authentication (non-blocking)...');
           const result = this.session!.userauthPassword(username, password);
 
           if (result === 0) {
-            console.log('🔍 SSHClient: Password authentication successful');
             resolve();
           } else if (result === -37) { // EAGAIN equivalent
-            console.log('🔍 SSHClient: Password auth would block, yielding and retrying...');
             setImmediate(attemptAuth);
           } else {
             reject(new SSHError(`Password authentication failed: ${result}`));
@@ -200,7 +182,6 @@ export class SSHClient {
             error.message.includes('EAGAIN') ||
             error.message.includes('try again')
           )) {
-            console.log('🔍 SSHClient: Password auth would block, yielding and retrying...');
             setImmediate(attemptAuth);
           } else {
             reject(error);
@@ -216,12 +197,9 @@ export class SSHClient {
    * Authenticate with public key using async retry pattern (inspired by async-ssh2-lite)
    */
   private async authenticatePublicKeyAsync(username: string, privateKeyPath: string, passphrase: string): Promise<void> {
-    console.log('🔍 SSHClient: Starting async public key auth with retry pattern');
-
     return new Promise((resolve, reject) => {
       const attemptAuth = () => {
         try {
-          console.log('🔍 SSHClient: Attempting public key authentication (non-blocking)...');
           const result = this.session!.userauthPublicKeyFromFile(
             username,
             `${privateKeyPath}.pub`,
@@ -230,10 +208,8 @@ export class SSHClient {
           );
 
           if (result === 0) {
-            console.log('🔍 SSHClient: Public key authentication successful');
             resolve();
           } else if (result === -37) { // EAGAIN equivalent
-            console.log('🔍 SSHClient: Public key auth would block, yielding and retrying...');
             setImmediate(attemptAuth);
           } else {
             reject(new SSHError(`Public key authentication failed: ${result}`));
@@ -244,7 +220,6 @@ export class SSHClient {
             error.message.includes('EAGAIN') ||
             error.message.includes('try again')
           )) {
-            console.log('🔍 SSHClient: Public key auth would block, yielding and retrying...');
             setImmediate(attemptAuth);
           } else {
             reject(error);
